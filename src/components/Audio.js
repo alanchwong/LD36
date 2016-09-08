@@ -4,25 +4,25 @@ import fetch from 'whatwg-fetch';
 export default class Audio extends Component {
   constructor() {
     super();
-    this._context = null;
-    this.loadContext = this.loadContext.bind(this);
+    this.loadContextFromAudioElement = this.loadContextFromAudioElement.bind(this);
   }
 
   componentWillReceiveProps(nextProps) {
 
   }
 
-  loadContext(audioElement) {
-    if (this._context) return;
+  loadContextFromAudioElement(audioElement) {
+    if (!audioElement || this._context) return;
 
     try {
       window.AudioContext = window.AudioContext || window.webkitAudioContext;
       this._context = new AudioContext();
       this._source = this._context.createMediaElementSource(audioElement);
       this._source.connect(this._context.destination);
+      audioElement.play();
     }
     catch(e) {
-      console.error('Web Audio API is not supported in this browser');
+      console.error('Error initializing Web Audio API: ' + e);
     }
   }
 
@@ -38,7 +38,7 @@ export default class Audio extends Component {
     //     })
     // }
     // catch(e) {
-    //   console.error('Web Audio API is not supported in this browser');
+    //   console.error('Error initializing Web Audio API: ' + e);
     // }
   }
 
@@ -48,6 +48,6 @@ export default class Audio extends Component {
 
   render() {
     const { source } = this.props;
-    return <audio src={source} ref={audioElement => this.loadContext(audioElement)} />;
+    return <audio src={source} ref={audioElement => this.loadContextFromAudioElement(audioElement)} />;
   }
 }

@@ -2,7 +2,9 @@ import React, { Component } from 'react';
 import Game from './Game.js'
 import TitleScreen from './TitleScreen.js'
 import GameOver from './GameOver.js'
+import Audio from './Audio';
 
+import music from '../../resource/LimitedColor.wav';
 import { GAMEMODE } from '../game/core.js';
 
 export default class Aqueductulous extends Component {
@@ -36,6 +38,15 @@ export default class Aqueductulous extends Component {
     const { gameMode, gameResult } = this.state;
     const hasSeed = !!window.location.hash;
 
+    return (
+      <div>
+        <Audio source={music} />
+        { this.renderCurrentScreen(gameMode, gameResult, hasSeed) }
+      </div>
+    )
+  }
+
+  renderCurrentScreen(gameMode, gameResult, hasSeed ) {
     switch (gameMode) {
       case GAMEMODE.Title:
         return (

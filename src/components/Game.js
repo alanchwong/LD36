@@ -13,9 +13,6 @@ import Player from './Player';
 import Level from './Level';
 import Background from './Background';
 import HazardFeedback from './HazardFeedback';
-import Audio from './Audio';
-
-import music from '../../resource/LimitedColor.wav';
 
 export default class Game extends Component {
   constructor({seed, onGameOver}) {
@@ -70,7 +67,6 @@ export default class Game extends Component {
         onTouchEnd={e => { e.preventDefault(); this.endAcceleration(); }}
         onTouchCancel={e => { e.preventDefault(); this.endAcceleration(); }}
       >
-        <Audio source={music}/>
         <Background xOffset={-player.position}/>
         <Level key={"vitrviusLevel"} {...enemyLevel} xOffset={player.position}/>
         <Player
