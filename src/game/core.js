@@ -92,7 +92,7 @@ export function updateTime(state, elapsedTime) {
     },
     enemyPlayer: {
       ...state.enemyPlayer,
-      accelerating: isEnemyAcceleratingNow,
+      accelerating: isEnemyAcclerating(state.enemyLevel, state.enemyPlayer, state.enemyAI),
       position: newEnemyPosition,
       xOffset: newEnemyPosition - (newPlayerPosition - playerXOffset)
     }
