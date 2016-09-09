@@ -1,53 +1,87 @@
-import React, { Component } from 'react';
-import fetch from 'whatwg-fetch';
+import React, { Component, PropTypes } from 'react';
 
-export default class Audio extends Component {
+export class AudioContext extends Component {
   constructor() {
     super();
-    this.loadContextFromAudioElement = this.loadContextFromAudioElement.bind(this);
-  }
-
-  componentWillReceiveProps(nextProps) {
-
-  }
-
-  loadContextFromAudioElement(audioElement) {
-    if (!audioElement || this._context) return;
 
     try {
       window.AudioContext = window.AudioContext || window.webkitAudioContext;
-      this._context = new AudioContext();
-      this._source = this._context.createMediaElementSource(audioElement);
-      this._source.connect(this._context.destination);
-      audioElement.play();
+      this._context = new window.AudioContext();
     }
     catch(e) {
-      console.error('Error initializing Web Audio API: ' + e);
+      console.error('Error initializing Web Audio context: ' + e);
     }
   }
 
-  componentWillMount() {
-    // const { source } = this.props;
-    // try {
-    //   window.AudioContext = window.AudioContext || window.webkitAudioContext;
-    //   this._context = new AudioContext();
-    //   fetch(resource)
-    //     .then(resource => resource.blob())
-    //     .then(blob => {
-    //       this._context.
-    //     })
-    // }
-    // catch(e) {
-    //   console.error('Error initializing Web Audio API: ' + e);
-    // }
-  }
-
-  componentWillUnmount() {
-
+  getChildContext() {
+    return { audio: this._context };
   }
 
   render() {
-    const { source } = this.props;
-    return <audio src={source} ref={audioElement => this.loadContextFromAudioElement(audioElement)} />;
+    const { tag:Tag, children } = this.props;
+    return <Tag>{ children }</Tag>;
   }
 }
+AudioContext.defaultProps = {
+  tag: 'div',
+}
+AudioContext.childContextTypes = {
+  audio: PropTypes.object,
+}
+
+export default class Audio extends Component {
+  componentWillMount() {
+    this.fetchSource(
+      source => {
+        this._source = source;
+        source.start();
+      },
+      error => console.error(error)
+    );
+  }
+
+  componentWillReceiveProps(nextProps) {
+    if (this._source) {
+      this._source.playbackRate.value = nextProps.playbackRate;
+    }
+  }
+
+  componentWillUnmount() {
+    this._source.stop();
+    delete this._source;
+  }
+
+  render() {
+    // Does not render any visual elements
+    return null;
+  }
+
+  fetchSource(onSuccess, onFailure) {
+    const { source } = this.props;
+    const { audio } = this.context;
+
+    return fetch(source)
+      .then(response => response.arrayBuffer())
+      .then(buffer => audio.decodeAudioData(buffer,
+        audioBuffer => {
+          const audioSource = audio.createBufferSource();
+          audioSource.buffer = audioBuffer;
+          audioSource.connect(audio.destination);
+          onSuccess(audioSource);
+        },
+        onFailure
+      ))
+      .catch(onFailure);
+  }
+}
+Audio.defaultProps = {
+  source: undefined,
+  playbackRate: 1,
+}
+Audio.PropTypes = {
+  source: PropTypes.string,
+  playbackRate: PropTypes.number,
+}
+Audio.contextTypes = {
+  audio: PropTypes.object.isRequired,
+};

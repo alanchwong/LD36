@@ -2,9 +2,7 @@ import React, { Component } from 'react';
 import Game from './Game.js'
 import TitleScreen from './TitleScreen.js'
 import GameOver from './GameOver.js'
-import Audio from './Audio';
 
-import music from '../../resource/LimitedColor.wav';
 import { GAMEMODE } from '../game/core.js';
 
 export default class Aqueductulous extends Component {
@@ -40,7 +38,6 @@ export default class Aqueductulous extends Component {
 
     return (
       <div>
-        <Audio source={music} />
         { this.renderCurrentScreen(gameMode, gameResult, hasSeed) }
       </div>
     )

@@ -1,10 +1,12 @@
 import React, { Component } from 'react';
 
 import { createInitialState,
+          currentVelocity,
           isPlayerAtEndOfTrack,
           isEnemyAtEndOfTrack,
           updateInput,
-          updateTime } from '../game/core';
+          updateTime,
+          VELOCITY } from '../game/core';
 
 import { playerXOffset } from '../game/player'
 
@@ -13,6 +15,12 @@ import Player from './Player';
 import Level from './Level';
 import Background from './Background';
 import HazardFeedback from './HazardFeedback';
+import BackgroundMusic from './BackgroundMusic';
+
+
+function relativeVelocity(state) {
+  return currentVelocity(state) / VELOCITY.FAST;
+}
 
 export default class Game extends Component {
   constructor({seed, onGameOver}) {
@@ -66,6 +74,7 @@ export default class Game extends Component {
         onTouchStart={e => { e.preventDefault(); this.beginAcceleration(); }}
         onTouchEnd={e => { e.preventDefault(); this.endAcceleration(); }}
         onTouchCancel={e => { e.preventDefault(); this.endAcceleration(); }}
+        domElements={<BackgroundMusic playbackRate={relativeVelocity(this.state)} />}
       >
         <Background xOffset={-player.position}/>
         <Level key={"vitrviusLevel"} {...enemyLevel} xOffset={player.position}/>

@@ -11,7 +11,7 @@ import { createEnemyProfile, isEnemyAcclerating } from './enemy.js'
 import { createLevel, indexForX, segmentForIndex } from './level.js'
 import { playerXOffset } from './player.js'
 
-const VELOCITY = {
+export const VELOCITY = {
   SLOW: 2.5,
   FAST: 4
 };
@@ -76,21 +76,12 @@ export function updateInput(state, accelerating) {
 
 export function updateTime(state, elapsedTime) {
   const dt = (elapsedTime - state.elapsedTime) / 1000;
-  const { position, accelerating } = state.player; 
-  const velocity = accelerating ? VELOCITY.FAST : VELOCITY.SLOW;
 
-  const newPlayerPosition = position + velocity * hazardVelocityModifier(state) * dt;
-
-  const isEnemyAcceleratingNow = isEnemyAcclerating(
-    state.enemyLevel,
-    state.enemyPlayer,
-    state.enemyAI
-  );
-  const enemyVelocity = isEnemyAcceleratingNow ? VELOCITY.FAST : VELOCITY.SLOW;
+  const newPlayerPosition = state.player.position + currentVelocity(state, CHARACTER.PLAYER) * dt;
   const newEnemyPosition = 
     isEnemyAtEndOfTrack(state) ? 
       state.enemyLevel.curve[state.enemyLevel.curve.length - 1].endpoint.x :
-      state.enemyPlayer.position + enemyVelocity * hazardVelocityModifier(state, CHARACTER.ENEMY) * dt;
+      state.enemyPlayer.position + currentVelocity(state, CHARACTER.ENEMY) * dt;
 
   const updatedMotion = {
     ...state,
@@ -196,4 +187,12 @@ function currentHazardResult(state, character = CHARACTER.PLAYER) {
 function hazardVelocityModifier(state, character = CHARACTER.PLAYER) {
   const hazard = currentHazardResult(state, character);
   return hazard ? hazard.velocity : 1;
+}
+
+export function currentVelocity(state, character = CHARACTER.PLAYER) {
+  const accelerating = character === CHARACTER.PLAYER
+    ? state.player.accelerating
+    : isEnemyAcclerating(state.enemyLevel, state.enemyPlayer, state.enemyAI);
+  const velocity = accelerating ? VELOCITY.FAST : VELOCITY.SLOW;
+  return velocity * hazardVelocityModifier(state, character);
 }

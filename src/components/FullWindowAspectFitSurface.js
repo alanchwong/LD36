@@ -31,7 +31,7 @@ export default class FullWindowAspectFitSurface extends Component {
   }
 
   render() {
-    const { aspect, maxWidth, children, ...rest } = this.props;
+    const { aspect, maxWidth, children, domElements, ...rest } = this.props;
 
     const screenDimensions = aspectFill(
       aspect.width / aspect.height,
@@ -48,6 +48,7 @@ export default class FullWindowAspectFitSurface extends Component {
         ref={view => view && view.focus()}
         {...rest}
       >
+        { domElements }
         <Surface {...screenDimensions}>
         { React.Children.map(children, (child, key) => cloneElement(child, { unitLength, key })) }
         </Surface>

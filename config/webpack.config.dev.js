@@ -170,6 +170,11 @@ module.exports = {
     ];
   },
   plugins: [
+    // Polyfills the `fetch` API with GitHub's implementation.
+    // See http://mts.io/2015/04/08/webpack-shims-polyfills/
+    new webpack.ProvidePlugin({
+      'fetch': 'imports?this=>global!exports?global.fetch!whatwg-fetch'
+    }),
     // Generates an `index.html` file with the <script> injected.
     new HtmlWebpackPlugin({
       inject: true,
