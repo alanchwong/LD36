@@ -1,87 +1,110 @@
-import React, { Component, PropTypes } from 'react';
+import { createElement, Component, PropTypes } from 'react';
+import Tone from 'tone';
 
-export class AudioContext extends Component {
-  constructor() {
-    super();
+//
+// Higher order component that manages the imperitve/object-oriented audio
+// resources and passes an `audio` prop to its wrapped component.
+//
+// Wrap the common parent of all of your Audio components with this, and
+// then use the `audio` object to control playback.
+//
+export function WithAudio (BaseComponent) {
+  class WrappedComponent extends Component {
+    static displayName = `WithAudio(${BaseComponent.displayName})`
 
-    try {
-      window.AudioContext = window.AudioContext || window.webkitAudioContext;
-      this._context = new window.AudioContext();
+    //
+    // These audioControls represent the imperative interface that is sent
+    // as a prop to a component wrapped with WithAudio, below.
+    //
+    static audioControls = {
+      start: () => Tone.Transport.start(),
+      stop: () => Tone.Transport.stop(),
+      log: () => console.log(Tone.Transport.state, Tone.Transport.position),
     }
-    catch(e) {
-      console.error('Error initializing Web Audio context: ' + e);
+
+    render() {
+      const { children, ...rest } = this.props;
+      return createElement(
+        BaseComponent,
+        { audio: WrappedComponent.audioControls, ...rest },
+        children
+      );
     }
   }
 
-  getChildContext() {
-    return { audio: this._context };
-  }
-
-  render() {
-    const { tag:Tag, children } = this.props;
-    return <Tag>{ children }</Tag>;
-  }
-}
-AudioContext.defaultProps = {
-  tag: 'div',
-}
-AudioContext.childContextTypes = {
-  audio: PropTypes.object,
+  return WrappedComponent;
 }
 
+//
+// This React component represents an individual audio clip.
+//
+// Currently wrapping Tone.GrainPlayer, allowing time-stretched playback.
+// See: https://tonejs.github.io/docs/#GrainPlayer
+//
 export default class Audio extends Component {
+  static propTypes = {
+    source: PropTypes.string.isRequired,  // URL
+    speed: PropTypes.number,              // normalized value (i.e. 1: normal)
+    startFrom: PropTypes.number,          // seconds from beginning of track
+    grainSize: PropTypes.number,          // seconds, param for GrainPlayer
+    overlap: PropTypes.number,            // seconds, param for GrainPlayer
+  }
+
+  static defaultProps = {
+    speed: 1,
+    startFrom: 0,
+    grainSize: 0.1,
+    overlap: 0.05,
+  }
+
   componentWillMount() {
-    this.fetchSource(
-      source => {
-        this._source = source;
-        source.start();
-      },
-      error => console.error(error)
-    );
+    const { source, startFrom } = this.props;
+    this._player = new Tone.GrainPlayer(
+      {
+        url: source,
+        onload: () => {
+          console.log('loaded ' + source);
+          this.renderAudio(this.props);
+          this._event = new Tone.Event(time => {
+            this._player.start(Tone.now(), startFrom);
+          });
+          this._event.start();
+        },
+      }
+    ).toMaster();
+  }
+
+  //
+  // "renders" updated audio props to the underlying object states.
+  //
+  // `source` is not updated
+  // `startFrom` is not updated (does it make sense to even update this?)
+  //
+  renderAudio(props) {
+    if (!this._player) return;
+
+    const { speed, grainSize, overlap } = props;
+    
+    this._player.playbackRate = speed;
+    this._player.grainSize = grainSize;
+    this._player.overlap =  overlap;
   }
 
   componentWillReceiveProps(nextProps) {
-    if (this._source) {
-      this._source.playbackRate.value = nextProps.playbackRate;
-    }
+    this.renderAudio(nextProps);
   }
 
   componentWillUnmount() {
-    this._source.stop();
-    delete this._source;
+    if (this._event) {
+      this._event.dispose();
+      delete this._event;
+    }
+    if (this._player) {
+      this._player.dispose();
+      delete this._player;
+    }
   }
 
-  render() {
-    // Does not render any visual elements
-    return null;
-  }
-
-  fetchSource(onSuccess, onFailure) {
-    const { source } = this.props;
-    const { audio } = this.context;
-
-    return fetch(source)
-      .then(response => response.arrayBuffer())
-      .then(buffer => audio.decodeAudioData(buffer,
-        audioBuffer => {
-          const audioSource = audio.createBufferSource();
-          audioSource.buffer = audioBuffer;
-          audioSource.connect(audio.destination);
-          onSuccess(audioSource);
-        },
-        onFailure
-      ))
-      .catch(onFailure);
-  }
+  // Does not render any visual elements
+  render() { return null; }
 }
-Audio.defaultProps = {
-  source: undefined,
-  playbackRate: 1,
-}
-Audio.PropTypes = {
-  source: PropTypes.string,
-  playbackRate: PropTypes.number,
-}
-Audio.contextTypes = {
-  audio: PropTypes.object.isRequired,
-};

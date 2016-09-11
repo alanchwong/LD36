@@ -15,6 +15,7 @@ import Player from './Player';
 import Level from './Level';
 import Background from './Background';
 import HazardFeedback from './HazardFeedback';
+import { WithAudio } from './Audio';
 import BackgroundMusic from './BackgroundMusic';
 
 
@@ -22,7 +23,7 @@ function relativeVelocity(state) {
   return currentVelocity(state) / VELOCITY.FAST;
 }
 
-export default class Game extends Component {
+class Game extends Component {
   constructor({seed, onGameOver}) {
     super();
 
@@ -54,7 +55,12 @@ export default class Game extends Component {
     this.raf = requestAnimationFrame(this.updateTime);
   }
 
+  componentDidMount() {
+    this.props.audio.start();
+  }
+
   componentWillUnmount() {
+    this.props.audio.stop();
     cancelAnimationFrame(this.raf);
   }
 
@@ -74,7 +80,9 @@ export default class Game extends Component {
         onTouchStart={e => { e.preventDefault(); this.beginAcceleration(); }}
         onTouchEnd={e => { e.preventDefault(); this.endAcceleration(); }}
         onTouchCancel={e => { e.preventDefault(); this.endAcceleration(); }}
-        domElements={<BackgroundMusic playbackRate={relativeVelocity(this.state)} />}
+        domElements={
+          <BackgroundMusic startFrom={75} speed={relativeVelocity(this.state)}/>
+        }
       >
         <Background xOffset={-player.position}/>
         <Level key={"vitrviusLevel"} {...enemyLevel} xOffset={player.position}/>
@@ -102,3 +110,5 @@ export default class Game extends Component {
     );
   }
 }
+
+export default WithAudio(Game);
