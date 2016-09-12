@@ -81,11 +81,10 @@ export function updateTime(state, elapsedTime) {
 
   const newPlayerPosition = position + velocity * hazardVelocityModifier(state) * dt;
 
-  const isEnemyAcceleratingNow = isEnemyAcclerating(
-    state.enemyLevel,
-    state.enemyPlayer,
-    state.enemyAI
-  );
+  // TODO: This is bullshit
+  console.log("UpdateTime Start");
+
+  const isEnemyAcceleratingNow = isEnemyAcclerating(state);
   const enemyVelocity = isEnemyAcceleratingNow ? VELOCITY.FAST : VELOCITY.SLOW;
   const newEnemyPosition = 
     isEnemyAtEndOfTrack(state) ? 
@@ -107,7 +106,13 @@ export function updateTime(state, elapsedTime) {
     }
   };
 
-  return updateHazardEvent(updateHazardEvent(updatedMotion, CHARACTER.PLAYER), CHARACTER.ENEMY);
+  //return updateHazardEvent(updateHazardEvent(updatedMotion, CHARACTER.PLAYER), CHARACTER.ENEMY);
+  const newState =  updateHazardEvent(updateHazardEvent(updatedMotion, CHARACTER.PLAYER), CHARACTER.ENEMY);
+
+  // TODO THIS IS ALSO bullshit
+  console.log("UpdateTime finished.");
+
+  return newState;
 }
 
 export function updateGameMode(state, gameMode) {
@@ -168,6 +173,13 @@ function updateHazardEvent(state, character = CHARACTER.PLAYER) {
       }
     }
     else if (character === CHARACTER.ENEMY) {
+      // TODO: REMOVE LATER
+      console.log(String.prototype.concat(
+        "*H* ",
+        "T: ", newLastHazardEvent.time, 
+        ", x: ", position, 
+        ", ", newLastHazardEvent.result.text
+        ));
       return {
         ...state,
         enemyPlayer: {
@@ -177,8 +189,13 @@ function updateHazardEvent(state, character = CHARACTER.PLAYER) {
         }
       }
     }
-    else { return state; }
+    else {
+      return state;
+    }
   }
+
+  // No hazard result AND in hazard means smartly didn't boost in hazard.
+  if (character === CHARACTER.ENEMY && isHazard) { console.log("*H* OK"); }
 
   return state;
 }

@@ -76,6 +76,11 @@ export default class Game extends Component {
           elapsedTime={elapsedTime}
           xOffset={enemyPlayer.xOffset}
         />
+        <HazardFeedback
+          player={enemyPlayer}
+          level={enemyLevel}
+          elapsedTime={elapsedTime}
+        />
         <Level key={"level"} {...level} xOffset={player.position}/>
         <Player
           key={"player"}

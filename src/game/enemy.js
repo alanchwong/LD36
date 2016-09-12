@@ -1,13 +1,4 @@
-import { HAZARD_RESULTS } from './core.js'
-
-// How close enemy needs to be to next endpoint
-// to start making decisions about entering the next
-// curve.
-const ENTER_CURVE_THRESHOLD = 0.25;
-
-// How far an enemy needs to be from the last endpoint
-// to make decisions about what to do when exiting a curve.
-const EXIT_CURVE_THRESHOLD = 0.55 //HAZARD_RESULTS.GOOD.window;
+import { HAZARD_RESULTS, VELOCITY } from './core.js'
 
 const Random = Math.random;
 
@@ -48,66 +39,65 @@ export function createEnemyProfile() {
   return enemyDifficultyLtCmdrData;
 }
 
-export function isEnemyAcclerating(enemyLevel, enemyPlayer, enemyAI) {
-  // Three axes of decision making -- populate with default values.
-  // Default is to not change action. Will need to have hierarchy
-  // of decision weight.
-  let shouldBoostForNextCurve = undefined;
-  let shouldBoostInThisCurve = undefined;
-  let shouldBoostAfterPreviousCurve = undefined;
-  let isErrorForNextCurve = false;
-  let isErrorInThisCurve = false;
-  let isErrorAfterPreviousCurve = false;
+export function isEnemyAcclerating(state) {
+  let {enemyLevel, enemyPlayer, enemyAI} = state;
+  let {curve, hazards} = enemyLevel;
+  let {position} = enemyPlayer;
+
+  // How close enemy needs to be to next endpoint
+  // to start making decisions about entering the next
+  // curve.
+  // This needs some tuning, maybe there's a reasoned way
+  // to pick a threshold based on the velocity per second?
+  // We update once in tens of milliseconds, so something like that?
+  const ENTER_CURVE_THRESHOLD = 0.25;
+
+  // How far an enemy needs to be from the last endpoint
+  // to make decisions about what to do when exiting a curve.
+  const EXIT_CURVE_THRESHOLD = HAZARD_RESULTS.GOOD.window;
+
+  // "Enum" for indicating which section of the track a decision pertains to
+  const Section = {
+    PREVIOUS: 0,
+    CURRENT: 1,
+    NEXT: 2,
+  }
+
+  // Array of decisions and states for previous section, 
+  // current section, and next section.
+  let isHazard = [undefined, undefined, undefined];
+  let shouldBoostDecision = [undefined, undefined, undefined];
+  let isErroneousDecision = [undefined, undefined, undefined];
+  
   let decisionForNextCurveMade = false;
   let decisionAfterPreviousCurveMade = false;
 
+  // Enemy is finished traversing the track, return false.
+  if (position >= curve[curve.length - 1].endpoint.x)
+    return false;
+
   // Figure out where we are! We are either inside a curve,
   // or at the endpoint linking two curves.
-  let occupiedCurve = undefined;
   let occupiedCurveIdx = 0;
-
-  for (occupiedCurveIdx = 0; occupiedCurveIdx < enemyLevel.curve.length; occupiedCurveIdx++) {
-    if (enemyLevel.curve[occupiedCurveIdx].endpoint.x >= enemyPlayer.position) {
-      occupiedCurve = enemyLevel.curve[occupiedCurveIdx];
+  for (occupiedCurveIdx = 0; occupiedCurveIdx < curve.length; occupiedCurveIdx++) {
+    if (curve[occupiedCurveIdx].endpoint.x >= position)
       break;
-    }
   };
-
-  // Enemy is done!
-  if (enemyPlayer.position >= enemyLevel.curve[enemyLevel.curve.length - 1].endpoint.x)
-    return false;
 
   // Okay we know where we are, how far are we from approaching the
   // endpoint of the curve?
-  let distanceFromNextEndpoint = occupiedCurve.endpoint.x - enemyPlayer.position;
-
-  // What kind of curve are we in?
-  let isInHazard = enemyLevel.hazards[occupiedCurveIdx];
-
-  // What kind of curve is ahead of us?
-  let isHazardAhead = 
-    occupiedCurveIdx + 1 < enemyLevel.hazards.length ?
-      enemyLevel.hazards[occupiedCurveIdx + 1] :
-      false;
-
-  // What kind of curve is behind us?
-  // In case we messed up boosting on hazard exit.
-  let previousCurve =
-    occupiedCurveIdx === 0 ?
-      undefined :
-      enemyLevel.curve[occupiedCurveIdx - 1];
+  let distanceFromNextEndpoint = curve[occupiedCurveIdx].endpoint.x - position;
 
   // How far are we from the last curve?
   let distanceFromPreviousEndpoint = 
-    previousCurve !== undefined ?
-      enemyPlayer.position - previousCurve.endpoint.x :
+    occupiedCurveIdx > 0 ?
+      position - curve[occupiedCurveIdx - 1].endpoint.x :
       NaN;
 
-  // Was it a hazard behind us?
-  let isHazardBehind =
-    occupiedCurveIdx !== 0 ?
-    enemyLevel.hazards[occupiedCurveIdx - 1] :
-    false;
+  // Are there hazards behind us, where we are, or in front?
+  isHazard[Section.CURRENT] = hazards[occupiedCurveIdx];
+  isHazard[Section.NEXT] = occupiedCurveIdx + 1 < hazards.length ? hazards[occupiedCurveIdx + 1] : false;
+  isHazard[Section.PREVIOUS] = occupiedCurveIdx !== 0 ? hazards[occupiedCurveIdx - 1] : false;
 
   // Okay, we know where we are, let's do stuff! Decision making:
   //  - If about to enter new curve, decide if we want to boost
@@ -118,96 +108,104 @@ export function isEnemyAcclerating(enemyLevel, enemyPlayer, enemyAI) {
     decisionForNextCurveMade = true;
 
     // Are we entering a hazard next and boosting?
-    if (isHazardAhead && enemyPlayer.accelerating) {
+    if (isHazard[Section.NEXT] && enemyPlayer.accelerating) {
     
-      // Hazard: We are going to successfully cancel boost.
       if (Random() < enemyAI.enterHazardBoostCancelPercent) {
-        shouldBoostForNextCurve = false;
-        isErrorForNextCurve = false;
+        // Correctly cancel boost.
+        shouldBoostDecision[Section.NEXT] = false;
+        isErroneousDecision[Section.NEXT] = false;
       }
       else {
-        shouldBoostForNextCurve = true;
-        isErrorForNextCurve = true;
+        // Erroneously continue boost.
+        shouldBoostDecision[Section.NEXT] = true;
+        isErroneousDecision[Section.NEXT] = true;
       }
     }
     // Are we entering a hazard next and NOT boosting?
-    else if (isHazardAhead && !enemyPlayer.accelerating) {
-      // Hazard: Stupid and start boosting?
+    else if (isHazard[Section.NEXT] && !enemyPlayer.accelerating) {
       if (Random() < enemyAI.enterHazardBoostErrorPercent) {
-        shouldBoostForNextCurve = true;
-        isErrorForNextCurve = true;
+        // Erroneously start boosting.
+        shouldBoostDecision[Section.NEXT] = true;
+        isErroneousDecision[Section.NEXT] = true;
       }
       else {
-        shouldBoostForNextCurve = false;
-        isErrorForNextCurve = false;
+        // Correctly not boost.
+        shouldBoostDecision[Section.NEXT] = false;
+        isErroneousDecision[Section.NEXT] = false;
       }
     }
     else {
       // We're about to enter a safe zone!
       if (Random() < enemyAI.enterSafeStartBoostPercent) {
-        shouldBoostForNextCurve = true;
-        isErrorForNextCurve = false;
+        // Correctly continue boosting for next safe curve.
+        shouldBoostDecision[Section.NEXT] = true;
+        isErroneousDecision[Section.NEXT] = false;
       }
       else {
-        shouldBoostForNextCurve = false;
-        isErrorForNextCurve = true;
+        // Erroneously stop/not-start boosting for next safe curve.
+        shouldBoostDecision[Section.NEXT] = false;
+        isErroneousDecision[Section.NEXT] = true;
       }
     }
   }
  
- if (distanceFromPreviousEndpoint <= EXIT_CURVE_THRESHOLD) {
-   decisionAfterPreviousCurveMade = true;
+  if (distanceFromPreviousEndpoint <= EXIT_CURVE_THRESHOLD) {
+    if (isHazard[Section.PREVIOUS]) {
+      // Only make a decision if we're exiting a hazard section.
+      // If we're exiting a safe section, the previous section has
+      // no bearing on decisions.
+      decisionAfterPreviousCurveMade = true;
 
-    // Did we just leave a hazard?
-    // Hazard: Are we going to trigger a boost?
-    // Hazard: If we're triggering, how accurate are we?
-   if (isHazardBehind) {
       if (Random() < enemyAI.exitHazardBoostPercent) {
-        shouldBoostAfterPreviousCurve = true;
-        isErrorAfterPreviousCurve = false;
+        // Correctly boost just after exiting a hazard zone for mad boost gains
+        shouldBoostDecision[Section.PREVIOUS] = true;
+        isErroneousDecision[Section.PREVIOUS] = false;
       }
       else {
-        shouldBoostAfterPreviousCurve = false;
-        isErrorAfterPreviousCurve = true;
+        // Erroneously stop/not-start boost just after exiting a hazard zone for no boost gains.
+        shouldBoostDecision[Section.PREVIOUS] = false;
+        isErroneousDecision[Section.PREVIOUS] = true;
       }
-    }
-    else { // Leaving safe curve, keep on keepin on.
-      shouldBoostAfterPreviousCurve = enemyPlayer.accelerating;
-      isErrorAfterPreviousCurve = false;
     }
   }
 
   // Decide what to do about the curve we're in.
-  if (isInHazard) {
+  if (isHazard[Section.CURRENT]) {
     if (Random() < enemyAI.inHazardBoostErrorPercent) {
-      shouldBoostInThisCurve = true;
-      isErrorInThisCurve = true;
+      // Erroneously boost inside a hazard curve
+      shouldBoostDecision[Section.CURRENT] = true;
+      isErroneousDecision[Section.CURRENT] = true;
     }
     else {
-      shouldBoostInThisCurve = false;
-      isErrorInThisCurve = false;
+      // Correctly stop boosting inside a hazard curve.
+      shouldBoostDecision[Section.CURRENT] = false;
+      isErroneousDecision[Section.CURRENT] = false;
     }
   }
   else {
     // In safe section, but we may screw up!
     if (enemyPlayer.accelerating) {
       if (Random() < enemyAI.inSafeStopBoostPercent) {
-        shouldBoostInThisCurve = false;
-        isErrorInThisCurve = true;
+        // Erroneously stop boosting inside a safe zone.
+        shouldBoostDecision[Section.CURRENT] = false;
+        isErroneousDecision[Section.CURRENT] = true;
       }
       else {
-        shouldBoostInThisCurve = true;
-        isErrorInThisCurve = false;
+        // Correctly boost inside a safe zone.
+        shouldBoostDecision[Section.CURRENT] = true;
+        isErroneousDecision[Section.CURRENT] = false;
       }
     }
     else
       if (Random() < enemyAI.inSafeStartBoostPercent) {
-        shouldBoostInThisCurve = true;
-        isErrorInThisCurve = false;
+        // Correctly boost inside a safe zone.
+        shouldBoostDecision[Section.CURRENT] = true;
+        isErroneousDecision[Section.CURRENT] = false;
       }
       else {
-        shouldBoostInThisCurve = true;
-        isErrorInThisCurve = true;
+        // Errorneously stop boosting inside a safe zone.
+        shouldBoostDecision[Section.CURRENT] = false;
+        isErroneousDecision[Section.CURRENT] = true;
       }
   }
 
@@ -215,89 +213,111 @@ export function isEnemyAcclerating(enemyLevel, enemyPlayer, enemyAI) {
   // So if everything agrees we should go for it.
   // What if I shouldn't boost not but should start boosting?
 
-  let shouldBoost = undefined;
+  let finalBoostDecision = {shouldBoost: undefined, decidedFrom: undefined};
 
   if (!decisionForNextCurveMade && !decisionAfterPreviousCurveMade) {
     // Decisions for CURR only
-    shouldBoost = shouldBoostInThisCurve;
+    finalBoostDecision.shouldBoost = shouldBoostDecision[Section.CURRENT];
+    finalBoostDecision.decidedFrom = "Current";
   }
   else if (!decisionForNextCurveMade) { 
     // Decisions for PREV, CURR
-    if (shouldBoostAfterPreviousCurve === shouldBoostInThisCurve) {
-      shouldBoost = shouldBoostAfterPreviousCurve;  // Both decisions agree.
+    if (shouldBoostDecision[Section.PREVIOUS] === shouldBoostDecision[Section.CURRENT]) {
+      finalBoostDecision.shouldBoost = shouldBoostDecision[Section.PREVIOUS];  // Both decisions agree.
+      finalBoostDecision.decidedFrom = "Previous & Current (Agreed.)";
     }
     else {
-      if ( isErrorInThisCurve && isErrorAfterPreviousCurve) {
+      if ( isErroneousDecision[Section.CURRENT] && isErroneousDecision[Section.PREVIOUS]) {
         // Two error decisions, who cares, pick one at random
-        shouldBoost = Random() < 0.5 ? 
-          shouldBoostInThisCurve : shouldBoostAfterPreviousCurve
+        const useCurrent = Random() < 0.5;
+        finalBoostDecision.shouldBoost = useCurrent ? shouldBoostDecision[Section.CURRENT] : shouldBoostDecision[Section.PREVIOUS]
+        finalBoostDecision.decidedFrom = useCurrent ? "Current" : "Previous";
       }
-      else if ( isErrorInThisCurve || isErrorAfterPreviousCurve) {
+      else if ( isErroneousDecision[Section.CURRENT] || isErroneousDecision[Section.PREVIOUS]) {
         // Only one error decision, see how error prone the AI is      
         if (Random() < enemyAI.errorPronenessPercent) {
-          shouldBoost = isErrorInThisCurve ? 
-            shouldBoostInThisCurve : shouldBoostAfterPreviousCurve;
+          // Choose the error decision.
+          finalBoostDecision.shouldBoost = isErroneousDecision[Section.CURRENT] ? 
+            shouldBoostDecision[Section.CURRENT] : shouldBoostDecision[Section.PREVIOUS];
+          finalBoostDecision.decidedFrom = isErroneousDecision[Section.CURRENT] ? "Current" : "Previous";
         }
         else {
-          shouldBoost = isErrorInThisCurve ?
-            shouldBoostAfterPreviousCurve : shouldBoostInThisCurve;
+          // Choose the correct decision.
+          finalBoostDecision.shouldBoost = isErroneousDecision[Section.CURRENT] ?
+            shouldBoostDecision[Section.PREVIOUS] : shouldBoostDecision[Section.CURRENT];
+          finalBoostDecision.decidedFrom = isErroneousDecision[Section.CURRENT] ? "Previous" : "Current";
         }
       }
       else {
-        // No error decisions, pick one at random
-        shouldBoost = Random() < 0.5 ?
-          shouldBoostInThisCurve : shouldBoostAfterPreviousCurve;
+        // No error decisions, pick one of the correct ones at random
+        const useCurrent = Random() < 0.5;
+        finalBoostDecision.shouldBoost = useCurrent ? shouldBoostDecision[Section.CURRENT] : shouldBoostDecision[Section.PREVIOUS];
+        finalBoostDecision.decidedFrom = useCurrent ? "Current" : "Previous";
       }
     }
   }
   else if (!decisionAfterPreviousCurveMade) {
     // Decisions for CURR, NEXT
-    if (shouldBoostInThisCurve === shouldBoostForNextCurve) {
-      shouldBoost = shouldBoostInThisCurve; // Both decisions agree
+    if (shouldBoostDecision[Section.CURRENT] === shouldBoostDecision[Section.NEXT]) {
+      finalBoostDecision.shouldBoost = shouldBoostDecision[Section.CURRENT]; // Both decisions agree
+      finalBoostDecision.decidedFrom = "Current & Next (Agreed)";
     }
     else {
-      if (isErrorInThisCurve && isErrorForNextCurve) {
+      if (isErroneousDecision[Section.CURRENT] && isErroneousDecision[Section.NEXT]) {
         // Two error decisions, pick one at random.
-        shouldBoost = Random() < 0.5 ?
-          shouldBoostInThisCurve :
-          shouldBoostForNextCurve;
+        const useCurrent = Random() < 0.5;
+        finalBoostDecision.shouldBoost = useCurrent ? shouldBoostDecision[Section.CURRENT] : shouldBoostDecision[Section.NEXT];
+        finalBoostDecision.decidedFrom = useCurrent ? "Current" : "Next";
       }
-      else if (isErrorInThisCurve || isErrorForNextCurve) {
+      else if (isErroneousDecision[Section.CURRENT] || isErroneousDecision[Section.NEXT]) {
         // Only one error decision, see how error prone AI is
         if (Random() < enemyAI.errorPronenessPercent) {
-          shouldBoost = isErrorInThisCurve ?
-            shouldBoostInThisCurve :
-            shouldBoostForNextCurve;
+          // Choose the erroneous decision
+          finalBoostDecision.shouldBoost = isErroneousDecision[Section.CURRENT] ?
+            shouldBoostDecision[Section.CURRENT] :
+            shouldBoostDecision[Section.NEXT];
+          finalBoostDecision.decidedFrom = isErroneousDecision[Section.CURRENT] ? "Current" : "Next";
         }
         else{
-          shouldBoost = isErrorInThisCurve ?
-            shouldBoostForNextCurve : shouldBoostInThisCurve;
+          // Choose the correct decision.
+          finalBoostDecision.shouldBoost = isErroneousDecision[Section.CURRENT] ?
+            shouldBoostDecision[Section.NEXT] : shouldBoostDecision[Section.CURRENT];
+          finalBoostDecision.decidedFrom = isErroneousDecision[Section.CURRENT] ? "Next" : "Current";
         }
       }
       else {
         // No error decisions, pick one at random.
-        shouldBoost = Random() < 0.5 ? 
-          shouldBoostInThisCurve : shouldBoostForNextCurve;
+        const useCurrent = Random() < 0.5;
+        finalBoostDecision.shouldBoost = useCurrent ? 
+          shouldBoostDecision[Section.CURRENT] : shouldBoostDecision[Section.NEXT];
+        finalBoostDecision.decidedFrom = useCurrent ? "Current" : "Next";
       }
     }
   }
   else {
     // Decisions for PREV, CURR, NEXT
-    if (shouldBoostAfterPreviousCurve === 
-        shouldBoostInThisCurve ===
-        shouldBoostForNextCurve) {
+    if (shouldBoostDecision[Section.PREVIOUS] === 
+        shouldBoostDecision[Section.CURRENT] ===
+        shouldBoostDecision[Section.NEXT]) {
           // All decisions agree, prioritize this.
-          shouldBoost = shouldBoostInThisCurve;
+          finalBoostDecision.shouldBoost = shouldBoostDecision[Section.CURRENT];
+          finalBoostDecision.decidedFrom = "Previous, Current, Next. (Agreed)";
     }
-    else if (isErrorAfterPreviousCurve === isErrorForNextCurve === isErrorInThisCurve) {
+    else if (isErroneousDecision[Section.PREVIOUS] === isErroneousDecision[Section.NEXT] === isErroneousDecision[Section.CURRENT]) {
       // All decisions are errors or all are correct, pick one at random!
       const roulette = Random();
-      if (roulette < (1/3)) 
-        shouldBoost = shouldBoostAfterPreviousCurve;
-      else if (roulette < (2/3))
-        shouldBoost = shouldBoostInThisCurve;
-      else
-        shouldBoost = shouldBoostForNextCurve;
+      if (roulette < (1/3)) {
+        finalBoostDecision.shouldBoost = shouldBoostDecision[Section.PREVIOUS];
+        finalBoostDecision.decidedFrom = "Previous";
+      }
+      else if (roulette < (2/3)) {
+        finalBoostDecision.shouldBoost = shouldBoostDecision[Section.CURRENT];
+        finalBoostDecision.decidedFrom = "Current";
+      }
+      else {
+        finalBoostDecision.shouldBoost = shouldBoostDecision[Section.NEXT];
+        finalBoostDecision.decidedFrom = "Next";
+      }
     }
     else {
       // At least one error!
@@ -307,36 +327,62 @@ export function isEnemyAcclerating(enemyLevel, enemyPlayer, enemyAI) {
       if (chooseError) {
         let errorDecisions = [];
 
-        if (isErrorAfterPreviousCurve)
-          errorDecisions.push(shouldBoostAfterPreviousCurve);
+        if (isErroneousDecision[Section.PREVIOUS])
+          errorDecisions.push(shouldBoostDecision[Section.PREVIOUS]);
 
-        if (isErrorForNextCurve)
-          errorDecisions.push(shouldBoostForNextCurve);
+        if (isErroneousDecision[Section.NEXT])
+          errorDecisions.push(shouldBoostDecision[Section.NEXT]);
 
-        if (isErrorInThisCurve)
-          errorDecisions.push(shouldBoostInThisCurve);
+        if (isErroneousDecision[Section.CURRENT])
+          errorDecisions.push(shouldBoostDecision[Section.CURRENT]);
 
         const errorIdx = Math.floor(Random() * errorDecisions.length);
-        shouldBoost = errorDecisions[errorIdx];
+        finalBoostDecision.shouldBoost = errorDecisions[errorIdx];
+
+        if (errorIdx === 0)
+          finalBoostDecision.decidedFrom = "Previous";
+        else if (errorIdx === 1)
+          finalBoostDecision.decidedFrom = "Next";
+        else
+          finalBoostDecision.decidedFrom = "Current";
       }
       else {
         // We choose the correct one, choose among the correct decisions.
         let correctDecisions = [];
 
-        if (!isErrorAfterPreviousCurve)
-          correctDecisions.push(shouldBoostAfterPreviousCurve);
+        if (!isErroneousDecision[Section.PREVIOUS])
+          correctDecisions.push(shouldBoostDecision[Section.PREVIOUS]);
 
-        if (!isErrorForNextCurve)
-          correctDecisions.push(shouldBoostForNextCurve);
+        if (!isErroneousDecision[Section.NEXT])
+          correctDecisions.push(shouldBoostDecision[Section.NEXT]);
 
-        if (!isErrorInThisCurve)
-          correctDecisions.push(shouldBoostInThisCurve);
+        if (!isErroneousDecision[Section.CURRENT])
+          correctDecisions.push(shouldBoostDecision[Section.CURRENT]);
 
         const correctIdx = Math.floor(Random() * correctDecisions.length);
-        shouldBoost = correctDecisions[correctIdx];
-      }
+        finalBoostDecision = correctDecisions[correctIdx];
+
+        if (correctIdx === 0)
+          finalBoostDecision.decidedFrom = "Previous";
+        else if (correctIdx === 1)
+          finalBoostDecision.decidedFrom = "Next";
+        else
+          finalBoostDecision.decidedFrom = "Current";      }
     }
   }
 
-  return shouldBoost;
+  console.log(String.prototype.concat(
+    "*AI* ",
+    "T: ", state.elapsedTime, 
+    ", x: ", enemyPlayer.position,
+    ", Boost? ", finalBoostDecision.shouldBoost, 
+    ", Basis: ", finalBoostDecision.decidedFrom,
+    ", Err: ", 
+      isErroneousDecision[Section.PREVIOUS] === undefined ? "n/a" : isErroneousDecision[Section.PREVIOUS], 
+      " ", isErroneousDecision[Section.CURRENT],
+      " ", isErroneousDecision[Section.NEXT] === undefined ? "n/a" : isErroneousDecision[Section.NEXT],
+    ", Haz: ", isHazard[Section.PREVIOUS], " ", isHazard[Section.CURRENT], " ", isHazard[Section.NEXT]
+  ));
+
+  return finalBoostDecision.shouldBoost;
 }
