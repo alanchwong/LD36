@@ -136,8 +136,8 @@ function isAtEndOfTrack(position, curve) {
 
 function updateHazardEvent(state, character = CHARACTER.PLAYER) {
   const { player, enemyPlayer, level, enemyLevel, elapsedTime } = state;
-  const { position, accelerating } = character === CHARACTER.PLAYER ? player : enemyPlayer;
-  const { curve, hazards } = character === CHARACTER.PLAYER ? level : enemyLevel;
+  const { position, accelerating } = (character === CHARACTER.PLAYER ? player : enemyPlayer);
+  const { curve, hazards } = (character === CHARACTER.PLAYER ? level : enemyLevel);
   const positionVisualAdjust = position + HAZARD_DETECTION_OFFSET;
   const isHazard = hazards[indexForX(curve, positionVisualAdjust)];
 
@@ -195,7 +195,10 @@ function updateHazardEvent(state, character = CHARACTER.PLAYER) {
   }
 
   // No hazard result AND in hazard means smartly didn't boost in hazard.
-  if (character === CHARACTER.ENEMY && isHazard) { console.log("*H* OK"); }
+  if (character === CHARACTER.ENEMY && isHazard) { 
+    console.log(
+    String.prototype.concat("*H* x:", position, ", OK"));
+  }
 
   return state;
 }

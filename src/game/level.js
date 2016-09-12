@@ -80,6 +80,13 @@ export function createLevel(startingYOffset=4.5, seed)
   curve.push(makeCubicBezier(2 * (lastX + 5) - (lastX + 3), 4.5, lastX + 7, 4.5, lastX + 10, 4.5));
   hazards.push(false);
 
+  // TODO logging
+  console.log(String.prototype.concat("Hazards seed: ", seed));
+
+  hazards.map( (value, index, array) => {
+    console.log(String.prototype.concat("endpt: ", curve[index].endpoint.x, " haz: ", value));
+  });
+
   return { curve, hazards };
 }
 

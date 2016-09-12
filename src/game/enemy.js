@@ -50,7 +50,7 @@ export function isEnemyAcclerating(state) {
   // This needs some tuning, maybe there's a reasoned way
   // to pick a threshold based on the velocity per second?
   // We update once in tens of milliseconds, so something like that?
-  const ENTER_CURVE_THRESHOLD = 0.25;
+  const ENTER_CURVE_THRESHOLD = 0.75;
 
   // How far an enemy needs to be from the last endpoint
   // to make decisions about what to do when exiting a curve.
@@ -149,23 +149,21 @@ export function isEnemyAcclerating(state) {
     }
   }
  
-  if (distanceFromPreviousEndpoint <= EXIT_CURVE_THRESHOLD) {
-    if (isHazard[Section.PREVIOUS]) {
-      // Only make a decision if we're exiting a hazard section.
-      // If we're exiting a safe section, the previous section has
-      // no bearing on decisions.
-      decisionAfterPreviousCurveMade = true;
+  if (distanceFromPreviousEndpoint <= EXIT_CURVE_THRESHOLD && isHazard[Section.PREVIOUS]) {
+    // Only make a decision if we're exiting a hazard section.
+    // If we're exiting a safe section, the previous section has
+    // no bearing on decisions.
+    decisionAfterPreviousCurveMade = true;
 
-      if (Random() < enemyAI.exitHazardBoostPercent) {
-        // Correctly boost just after exiting a hazard zone for mad boost gains
-        shouldBoostDecision[Section.PREVIOUS] = true;
-        isErroneousDecision[Section.PREVIOUS] = false;
-      }
-      else {
-        // Erroneously stop/not-start boost just after exiting a hazard zone for no boost gains.
-        shouldBoostDecision[Section.PREVIOUS] = false;
-        isErroneousDecision[Section.PREVIOUS] = true;
-      }
+    if (Random() < enemyAI.exitHazardBoostPercent) {
+      // Correctly boost just after exiting a hazard zone for mad boost gains
+      shouldBoostDecision[Section.PREVIOUS] = true;
+      isErroneousDecision[Section.PREVIOUS] = false;
+    }
+    else {
+      // Erroneously stop/not-start boost just after exiting a hazard zone for no boost gains.
+      shouldBoostDecision[Section.PREVIOUS] = false;
+      isErroneousDecision[Section.PREVIOUS] = true;
     }
   }
 
@@ -196,7 +194,7 @@ export function isEnemyAcclerating(state) {
         isErroneousDecision[Section.CURRENT] = false;
       }
     }
-    else
+    else {
       if (Random() < enemyAI.inSafeStartBoostPercent) {
         // Correctly boost inside a safe zone.
         shouldBoostDecision[Section.CURRENT] = true;
@@ -207,167 +205,110 @@ export function isEnemyAcclerating(state) {
         shouldBoostDecision[Section.CURRENT] = false;
         isErroneousDecision[Section.CURRENT] = true;
       }
+    }
   }
 
-  // Decide what we should actually do! Uhhh...
-  // So if everything agrees we should go for it.
-  // What if I shouldn't boost not but should start boosting?
+  /*
+    At this point the enemy player has perceived the previous curve section,
+    the current curve section, and the next curve section, assuming it's close
+    enough to the previous and next sections to require decision making. 
+    The enemy player now has up to three possible decisions it can choose from,
+    each of which is either a correct choice or an incorrect choice.
+    
+    The final decision logic flow is as follows:
+      - If there is only one decision, a decision made for the current curve, 
+        then the enemy player goes with that.
+      - Otherwise, there are at least two decisions: choices for previous and 
+        current curves, current and next curves, or previous, current, and next
+        curves. In these cases, the decision needs to be made by "hazard priority."
+      - Hazard priority means that the right or wrong choice is determined by the
+        most pressing hazard. Hazard sections take priority over safe sections
+        because the wrong choice in a safe section only gives normal speed, while 
+        wrong choices for hazard sections penalize the enemy player with much lower 
+        speed. Most pressing means which hazard is most immediately affected by the 
+        decision made at this point. In order of decreasing priority:
+
+          1. Hazard in current section.
+          2. Hazard in next section.
+          3. Hazard in previous section.
+          4. No hazards in any sections. The previous section is irrelevant because
+            it only matters if it were a hazard. The correct action for current and
+            next sections are the same -- since they're both safe, should boost.
+  */
 
   let finalBoostDecision = {shouldBoost: undefined, decidedFrom: undefined};
 
   if (!decisionForNextCurveMade && !decisionAfterPreviousCurveMade) {
-    // Decisions for CURR only
+    // Only one decision made, just go with that.
     finalBoostDecision.shouldBoost = shouldBoostDecision[Section.CURRENT];
     finalBoostDecision.decidedFrom = "Current";
   }
-  else if (!decisionForNextCurveMade) { 
-    // Decisions for PREV, CURR
-    if (shouldBoostDecision[Section.PREVIOUS] === shouldBoostDecision[Section.CURRENT]) {
-      finalBoostDecision.shouldBoost = shouldBoostDecision[Section.PREVIOUS];  // Both decisions agree.
-      finalBoostDecision.decidedFrom = "Previous & Current (Agreed.)";
-    }
-    else {
-      if ( isErroneousDecision[Section.CURRENT] && isErroneousDecision[Section.PREVIOUS]) {
-        // Two error decisions, who cares, pick one at random
-        const useCurrent = Random() < 0.5;
-        finalBoostDecision.shouldBoost = useCurrent ? shouldBoostDecision[Section.CURRENT] : shouldBoostDecision[Section.PREVIOUS]
-        finalBoostDecision.decidedFrom = useCurrent ? "Current" : "Previous";
-      }
-      else if ( isErroneousDecision[Section.CURRENT] || isErroneousDecision[Section.PREVIOUS]) {
-        // Only one error decision, see how error prone the AI is      
-        if (Random() < enemyAI.errorPronenessPercent) {
-          // Choose the error decision.
-          finalBoostDecision.shouldBoost = isErroneousDecision[Section.CURRENT] ? 
-            shouldBoostDecision[Section.CURRENT] : shouldBoostDecision[Section.PREVIOUS];
-          finalBoostDecision.decidedFrom = isErroneousDecision[Section.CURRENT] ? "Current" : "Previous";
-        }
-        else {
-          // Choose the correct decision.
-          finalBoostDecision.shouldBoost = isErroneousDecision[Section.CURRENT] ?
-            shouldBoostDecision[Section.PREVIOUS] : shouldBoostDecision[Section.CURRENT];
-          finalBoostDecision.decidedFrom = isErroneousDecision[Section.CURRENT] ? "Previous" : "Current";
-        }
-      }
-      else {
-        // No error decisions, pick one of the correct ones at random
-        const useCurrent = Random() < 0.5;
-        finalBoostDecision.shouldBoost = useCurrent ? shouldBoostDecision[Section.CURRENT] : shouldBoostDecision[Section.PREVIOUS];
-        finalBoostDecision.decidedFrom = useCurrent ? "Current" : "Previous";
-      }
-    }
-  }
-  else if (!decisionAfterPreviousCurveMade) {
-    // Decisions for CURR, NEXT
-    if (shouldBoostDecision[Section.CURRENT] === shouldBoostDecision[Section.NEXT]) {
-      finalBoostDecision.shouldBoost = shouldBoostDecision[Section.CURRENT]; // Both decisions agree
-      finalBoostDecision.decidedFrom = "Current & Next (Agreed)";
-    }
-    else {
-      if (isErroneousDecision[Section.CURRENT] && isErroneousDecision[Section.NEXT]) {
-        // Two error decisions, pick one at random.
-        const useCurrent = Random() < 0.5;
-        finalBoostDecision.shouldBoost = useCurrent ? shouldBoostDecision[Section.CURRENT] : shouldBoostDecision[Section.NEXT];
-        finalBoostDecision.decidedFrom = useCurrent ? "Current" : "Next";
-      }
-      else if (isErroneousDecision[Section.CURRENT] || isErroneousDecision[Section.NEXT]) {
-        // Only one error decision, see how error prone AI is
-        if (Random() < enemyAI.errorPronenessPercent) {
-          // Choose the erroneous decision
-          finalBoostDecision.shouldBoost = isErroneousDecision[Section.CURRENT] ?
-            shouldBoostDecision[Section.CURRENT] :
-            shouldBoostDecision[Section.NEXT];
-          finalBoostDecision.decidedFrom = isErroneousDecision[Section.CURRENT] ? "Current" : "Next";
-        }
-        else{
-          // Choose the correct decision.
-          finalBoostDecision.shouldBoost = isErroneousDecision[Section.CURRENT] ?
-            shouldBoostDecision[Section.NEXT] : shouldBoostDecision[Section.CURRENT];
-          finalBoostDecision.decidedFrom = isErroneousDecision[Section.CURRENT] ? "Next" : "Current";
-        }
-      }
-      else {
-        // No error decisions, pick one at random.
-        const useCurrent = Random() < 0.5;
-        finalBoostDecision.shouldBoost = useCurrent ? 
-          shouldBoostDecision[Section.CURRENT] : shouldBoostDecision[Section.NEXT];
-        finalBoostDecision.decidedFrom = useCurrent ? "Current" : "Next";
-      }
-    }
-  }
   else {
-    // Decisions for PREV, CURR, NEXT
-    if (shouldBoostDecision[Section.PREVIOUS] === 
-        shouldBoostDecision[Section.CURRENT] ===
-        shouldBoostDecision[Section.NEXT]) {
-          // All decisions agree, prioritize this.
-          finalBoostDecision.shouldBoost = shouldBoostDecision[Section.CURRENT];
-          finalBoostDecision.decidedFrom = "Previous, Current, Next. (Agreed)";
+    // At least two decisions made. Use hazard priority.
+
+    // 1. Hazard in current section?
+    if (isHazard[Section.CURRENT]) {
+      finalBoostDecision.shouldBoost = shouldBoostDecision[Section.CURRENT];
+      finalBoostDecision.decidedFrom = "Current (HazPri)";
     }
-    else if (isErroneousDecision[Section.PREVIOUS] === isErroneousDecision[Section.NEXT] === isErroneousDecision[Section.CURRENT]) {
-      // All decisions are errors or all are correct, pick one at random!
-      const roulette = Random();
-      if (roulette < (1/3)) {
-        finalBoostDecision.shouldBoost = shouldBoostDecision[Section.PREVIOUS];
-        finalBoostDecision.decidedFrom = "Previous";
-      }
-      else if (roulette < (2/3)) {
-        finalBoostDecision.shouldBoost = shouldBoostDecision[Section.CURRENT];
-        finalBoostDecision.decidedFrom = "Current";
-      }
-      else {
-        finalBoostDecision.shouldBoost = shouldBoostDecision[Section.NEXT];
-        finalBoostDecision.decidedFrom = "Next";
-      }
+    // 2. Hazard in next section?
+    else if (isHazard[Section.NEXT] && decisionForNextCurveMade) {
+      finalBoostDecision.shouldBoost = shouldBoostDecision[Section.NEXT];
+      finalBoostDecision.decidedFrom = "Next (HazPri)";
     }
+    // 3. Hazard in previous section?
+    else if (isHazard[Section.PREVIOUS] && decisionAfterPreviousCurveMade) {
+      finalBoostDecision.shouldBoost = shouldBoostDecision[Section.PREVIOUS];
+      finalBoostDecision.decidedFrom = "Previous (HazPri)";
+    }
+    // 4. No hazards in any section.
     else {
-      // At least one error!
-      const chooseError = Random() < enemyAI.errorPronenessPercent;
+      // Push error decisions in to an array, push correct decisions into an array.
+      // Then choose a correct or incorrect decision based on AI errorproneness.
+      let errorDecisions = [];
+      let correctDecisions = [];
 
-      // If we oopsies, only choose among the error decisions.
-      if (chooseError) {
-        let errorDecisions = [];
-
+      if (decisionAfterPreviousCurveMade) {
         if (isErroneousDecision[Section.PREVIOUS])
-          errorDecisions.push(shouldBoostDecision[Section.PREVIOUS]);
-
-        if (isErroneousDecision[Section.NEXT])
-          errorDecisions.push(shouldBoostDecision[Section.NEXT]);
-
-        if (isErroneousDecision[Section.CURRENT])
-          errorDecisions.push(shouldBoostDecision[Section.CURRENT]);
-
-        const errorIdx = Math.floor(Random() * errorDecisions.length);
-        finalBoostDecision.shouldBoost = errorDecisions[errorIdx];
-
-        if (errorIdx === 0)
-          finalBoostDecision.decidedFrom = "Previous";
-        else if (errorIdx === 1)
-          finalBoostDecision.decidedFrom = "Next";
+          errorDecisions.push({ 
+            shouldBoost: shouldBoostDecision[Section.PREVIOUS], 
+            decidedFrom: "Previous (Err)"});
         else
-          finalBoostDecision.decidedFrom = "Current";
+          correctDecisions.push({
+            shouldBoost: shouldBoostDecision[Section.PREVIOUS],
+            decidedFrom: "Previous" });
+      }
+
+      if (isErroneousDecision[Section.CURRENT])
+        errorDecisions.push({
+          shouldBoost: shouldBoostDecision[Section.CURRENT],
+          decidedFrom: "Current (Err)" });
+      else
+        correctDecisions.push({
+          shouldBoost:shouldBoostDecision[Section.CURRENT],
+          decidedFrom: "Current" });
+
+      if (decisionForNextCurveMade) {
+        if (isErroneousDecision[Section.NEXT])
+          errorDecisions.push({
+            shouldBoost: shouldBoostDecision[Section.NEXT],
+            decidedFrom: "Next (Err)" });
+        else
+          correctDecisions.push({
+            shouldBoost: shouldBoostDecision[Section.NEXT],
+            decidedFrom: "Next" });
+      }
+
+      if (errorDecisions.length > 0 && 
+        (correctDecisions.length === 0 || Random() < enemyAI.errorProneessPercent)) {
+        const index = Math.floor(Random() * errorDecisions.length);
+        finalBoostDecision = errorDecisions[index];
       }
       else {
-        // We choose the correct one, choose among the correct decisions.
-        let correctDecisions = [];
-
-        if (!isErroneousDecision[Section.PREVIOUS])
-          correctDecisions.push(shouldBoostDecision[Section.PREVIOUS]);
-
-        if (!isErroneousDecision[Section.NEXT])
-          correctDecisions.push(shouldBoostDecision[Section.NEXT]);
-
-        if (!isErroneousDecision[Section.CURRENT])
-          correctDecisions.push(shouldBoostDecision[Section.CURRENT]);
-
-        const correctIdx = Math.floor(Random() * correctDecisions.length);
-        finalBoostDecision = correctDecisions[correctIdx];
-
-        if (correctIdx === 0)
-          finalBoostDecision.decidedFrom = "Previous";
-        else if (correctIdx === 1)
-          finalBoostDecision.decidedFrom = "Next";
-        else
-          finalBoostDecision.decidedFrom = "Current";      }
+        const index = Math.floor(Random() * correctDecisions.length);
+        finalBoostDecision = correctDecisions[index];
+      }
+      
     }
   }
 
