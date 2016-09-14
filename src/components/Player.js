@@ -5,7 +5,7 @@ import BubbleEffect from './BubbleEffect';
 import SplashEffect from './SplashEffect';
 
 import { trailingPathForX, tangentForX } from '../game/level';
-import { playerCenter, playerXOffset } from '../game/player';
+import { playerCenter } from '../game/player';
 
 function PlayerTrail ({
   position,

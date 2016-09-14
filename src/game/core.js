@@ -76,21 +76,21 @@ export function updateInput(state, accelerating) {
 
 export function updateTime(state, elapsedTime) {
   const dt = (elapsedTime - state.elapsedTime) / 1000;
+
   const { position, accelerating } = state.player; 
   const velocity = accelerating ? VELOCITY.FAST : VELOCITY.SLOW;
 
+  const enemyPosition = state.enemyPlayer.position;
+  const enemyVelocity = state.enemyPlayer.accelerating ? VELOCITY.FAST : VELOCITY.SLOW;
+
   const newPlayerPosition = position + velocity * hazardVelocityModifier(state) * dt;
+  const newEnemyPosition = isEnemyAtEndOfTrack(state) ?
+    state.enemyLevel.curve[state.enemyLevel.curve.length - 1].endpoint.x : 
+    enemyPosition + enemyVelocity * hazardVelocityModifier(state, CHARACTER.ENEMY) * dt;
 
   // TODO: This is bullshit
-  console.log("UpdateTime Start");
-
-  const isEnemyAcceleratingNow = isEnemyAcclerating(state);
-  const enemyVelocity = isEnemyAcceleratingNow ? VELOCITY.FAST : VELOCITY.SLOW;
-  const newEnemyPosition = 
-    isEnemyAtEndOfTrack(state) ? 
-      state.enemyLevel.curve[state.enemyLevel.curve.length - 1].endpoint.x :
-      state.enemyPlayer.position + enemyVelocity * hazardVelocityModifier(state, CHARACTER.ENEMY) * dt;
-
+  console.log("UpdateTime Start " + elapsedTime);
+  
   const updatedMotion = {
     ...state,
     elapsedTime,
@@ -100,7 +100,6 @@ export function updateTime(state, elapsedTime) {
     },
     enemyPlayer: {
       ...state.enemyPlayer,
-      accelerating: isEnemyAcceleratingNow,
       position: newEnemyPosition,
       xOffset: newEnemyPosition - (newPlayerPosition - playerXOffset)
     }
@@ -109,10 +108,19 @@ export function updateTime(state, elapsedTime) {
   //return updateHazardEvent(updateHazardEvent(updatedMotion, CHARACTER.PLAYER), CHARACTER.ENEMY);
   const newState =  updateHazardEvent(updateHazardEvent(updatedMotion, CHARACTER.PLAYER), CHARACTER.ENEMY);
 
-  // TODO THIS IS ALSO bullshit
-  console.log("UpdateTime finished.");
+  // Do the thing
+  const newNewState = {
+    ...newState,
+    enemyPlayer: {
+      ...newState.enemyPlayer,
+      accelerating: isEnemyAcclerating(newState)
+    },
+  };
 
-  return newState;
+  // TODO THIS IS ALSO bullshit
+  console.log("UpdateTime finished " + elapsedTime);
+
+  return newNewState;
 }
 
 export function updateGameMode(state, gameMode) {
@@ -136,26 +144,57 @@ function isAtEndOfTrack(position, curve) {
 
 function updateHazardEvent(state, character = CHARACTER.PLAYER) {
   const { player, enemyPlayer, level, enemyLevel, elapsedTime } = state;
-  const { position, accelerating } = (character === CHARACTER.PLAYER ? player : enemyPlayer);
-  const { curve, hazards } = (character === CHARACTER.PLAYER ? level : enemyLevel);
+  const { position, accelerating } = character === CHARACTER.PLAYER ? player : enemyPlayer;
+  const { curve, hazards } = character === CHARACTER.PLAYER ? level : enemyLevel;
   const positionVisualAdjust = position + HAZARD_DETECTION_OFFSET;
   const isHazard = hazards[indexForX(curve, positionVisualAdjust)];
 
   let hazardResult;
 
-  if (accelerating && !currentHazardResult(state)) {
+  if (accelerating && !currentHazardResult(state, character)) {
     if (isHazard) {
       hazardResult = HAZARD_RESULTS.FAIL;
     } else {
-      const previousIndex = indexForX(level.curve, positionVisualAdjust) - 1;
+      const previousIndex = indexForX(curve, positionVisualAdjust) - 1;
+
+      if (character === CHARACTER.ENEMY) {
+        console.log(String.prototype.concat(
+          "*HCalc1 ",
+          "x: ", positionVisualAdjust,
+          ", PrevIdx: ", previousIndex,
+          ", IsPrevHaz: ", hazards[previousIndex],
+        ));
+      }
+
       if (previousIndex >= 0 && hazards[previousIndex]) {
         const segment = segmentForIndex(curve, previousIndex);
         const hazardDistance = positionVisualAdjust - segment.endpoint.x;
         if (hazardDistance <= HAZARD_RESULTS.GOOD.window) hazardResult = HAZARD_RESULTS.GOOD;
         if (hazardDistance <= HAZARD_RESULTS.GREAT.window) hazardResult = HAZARD_RESULTS.GREAT;
         if (hazardDistance <= HAZARD_RESULTS.AMAZING.window) hazardResult = HAZARD_RESULTS.AMAZING;
+
+        if (character === CHARACTER.ENEMY) {
+          console.log(String.prototype.concat(
+            "*HCalc2 ",
+            "prevX: ", segment.endpoint.x,
+            ", HazDist: ", hazardDistance
+          ));
+        }
       }
     }
+  }
+
+  if (character === CHARACTER.ENEMY) {
+    console.log(String.prototype.concat(
+      "*HCalc3 ",
+      "T: ", elapsedTime,
+      ", x: ", position,
+      ", acc: ", accelerating,
+      ", idx: ", indexForX(curve, positionVisualAdjust),
+      ", isHaz: ", isHazard,
+      ", HazRes: ", hazardResult,
+      ", LastHazRes: ", currentHazardResult(state),
+    ));
   }
 
   if (hazardResult) {
@@ -197,7 +236,7 @@ function updateHazardEvent(state, character = CHARACTER.PLAYER) {
   // No hazard result AND in hazard means smartly didn't boost in hazard.
   if (character === CHARACTER.ENEMY && isHazard) { 
     console.log(
-    String.prototype.concat("*H* x:", position, ", OK"));
+    String.prototype.concat("*H* t:", elapsedTime,"x:", position, ", OK"));
   }
 
   return state;

@@ -1,4 +1,4 @@
-import { HAZARD_RESULTS, VELOCITY } from './core.js'
+import { HAZARD_RESULTS } from './core.js'
 
 const Random = Math.random;
 
