@@ -3,57 +3,70 @@ import Game from './Game.js'
 import TitleScreen from './TitleScreen.js'
 import GameOver from './GameOver.js'
 
-import { GAMEMODE } from '../game/core.js';
+import { createInitialState } from '../state';
+import { createInitialState as createGame } from '../state/game'
+
+const VIEWS = {
+  Title: Symbol('Title'),
+  Playing: Symbol('Playing'),
+  GameOver: Symbol('GameOver'),
+};
+
+function newLevelSeed() {
+  return window.btoa((Math.random() * 10e2).toFixed(0))
+}
 
 export default class Aqueductulous extends Component {
   constructor() {
     super();
 
-    this.showTitle = this.updateGameMode.bind(this, GAMEMODE.Title);
-    this.newGame = () => {
-      window.history.replaceState({}, '', '#' + window.btoa((Math.random() * 10e2).toFixed(0)));
-      this.updateGameMode(GAMEMODE.Playing);
-    };
-    this.rematch = this.updateGameMode.bind(this, GAMEMODE.Playing);
-    this.showGameOver = result => {
-      this.updateGameMode(GAMEMODE.GameOver, result);
+    this.state = {
+      ...createInitialState(),
+      view: VIEWS.Title,
     }
 
-    this.state = {
-      gameMode: GAMEMODE.Title,
-      gameResult: undefined, /*{
-        time: 0,
-        won: false,
-      }*/
-    }
+    this.newGame = this.newGame.bind(this);
+    this.updateGame = (game, onComplete) => this.setState({ game }, onComplete);
+    this.showGameOver = this.setState.bind(this, { view: VIEWS.GameOver });
+    this.rematch = this.startGame.bind(this, null);
   }
 
-  updateGameMode(gameMode, gameResult) {
-    this.setState({gameMode, gameResult});
+  newGame() {
+    const newSeed = newLevelSeed();
+    window.history.replaceState({}, '', '#' + newSeed);
+    this.startGame(newSeed);
+  }
+
+  startGame(seed) {
+    this.setState({
+      game: createGame(seed),
+      view: VIEWS.Playing,
+    });
   }
 
   render() {
-    const { gameMode, gameResult } = this.state;
+    const { view, game } = this.state;
     const hasSeed = !!window.location.hash;
 
-    switch (gameMode) {
-      case GAMEMODE.Title:
+    switch (view) {
+      case VIEWS.Title:
         return (
           <TitleScreen
             onStartGame={hasSeed ? this.rematch : this.newGame}
           />
         )
-      case GAMEMODE.Playing:
+      case VIEWS.Playing:
         return (
           <Game
-            seed={window.location.hash}
+            state={game}
+            updateState={this.updateGame}
             onGameOver={this.showGameOver} 
           />
         );
-      case GAMEMODE.GameOver:
+      case VIEWS.GameOver:
         return (
           <GameOver
-            result={gameResult}
+            game={game}
             onRematch={this.rematch}
             onNewGame={this.newGame}
           />

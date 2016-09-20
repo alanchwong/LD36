@@ -1,6 +1,6 @@
 import React from 'react';
 import { Group, Shape } from 'react-art';
-import { playerXOffset as playerGameXGap } from '../game/player';
+import { playerXOffset as playerGameXGap } from '../state/game/player';
 
 const LIGHT_AQUADUCT_COLOR = 0xAAA;
 const DARK_AQUADUCT_COLOR = 0x999;
