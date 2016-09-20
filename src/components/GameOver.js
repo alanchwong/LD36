@@ -4,6 +4,8 @@ import { Group, Text } from 'react-art';
 import FullWindowAspectFitSurface from './FullWindowAspectFitSurface';
 import Button from './Button';
 
+import { isEnemyAtEndOfTrack } from '../state/game';
+
 const baseText = {
   fill: '#fff',
   font: {
@@ -57,10 +59,13 @@ function GameOverLayout ({
   );
 }
 
-export default function GameOver (props) {
+export default function GameOver ({game, ...rest}) {
   return (
     <FullWindowAspectFitSurface>
-      <GameOverLayout {...props} />
+      <GameOverLayout result={{
+        time: game.elapsedTime,
+        won: !isEnemyAtEndOfTrack(game), // a tie is a loss!
+      }} {...rest}/>
     </FullWindowAspectFitSurface>
   );
 }

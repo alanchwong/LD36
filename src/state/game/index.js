@@ -9,23 +9,12 @@
 
 import { createEnemyProfile, isEnemyAcclerating } from './enemy.js'
 import { createLevel, indexForX, segmentForIndex } from './level.js'
-import { playerXOffset } from './player.js'
-
-const VELOCITY = {
-  SLOW: 2.5,
-  FAST: 4
-};
+import { baseSpeed, slowerSpeedRatio, playerXOffset } from './player.js'
 
 const CHARACTER = {
   PLAYER: 1,
   ENEMY: 2,
 }
-
-export const GAMEMODE = {
-  Title: 1,
-  Playing: 2,
-  GameOver: 3
-};
 
 export const HAZARD_RESULTS = {
   FAIL: { text: 'TOO FAST', velocity: 0.5 },
@@ -77,7 +66,7 @@ export function updateInput(state, accelerating) {
 export function updateTime(state, elapsedTime) {
   const dt = (elapsedTime - state.elapsedTime) / 1000;
   const { position, accelerating } = state.player; 
-  const velocity = accelerating ? VELOCITY.FAST : VELOCITY.SLOW;
+  const velocity = baseSpeed * (accelerating ? 1 : slowerSpeedRatio);
 
   const newPlayerPosition = position + velocity * hazardVelocityModifier(state) * dt;
 
@@ -86,7 +75,7 @@ export function updateTime(state, elapsedTime) {
     state.enemyPlayer,
     state.enemyAI
   );
-  const enemyVelocity = isEnemyAcceleratingNow ? VELOCITY.FAST : VELOCITY.SLOW;
+  const enemyVelocity = baseSpeed * (isEnemyAcceleratingNow ? 1 : slowerSpeedRatio);
   const newEnemyPosition = 
     isEnemyAtEndOfTrack(state) ? 
       state.enemyLevel.curve[state.enemyLevel.curve.length - 1].endpoint.x :
@@ -108,13 +97,6 @@ export function updateTime(state, elapsedTime) {
   };
 
   return updateHazardEvent(updateHazardEvent(updatedMotion, CHARACTER.PLAYER), CHARACTER.ENEMY);
-}
-
-export function updateGameMode(state, gameMode) {
-  return {
-    ...state,
-    gameMode
-  };
 }
 
 export function isPlayerAtEndOfTrack(state) {

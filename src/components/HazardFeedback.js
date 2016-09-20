@@ -3,8 +3,8 @@ import { Group } from 'react-art';
 import { easeElastic } from 'd3';
 
 import ShadowText from './ShadowText';
-import { playerCenter } from '../game/player';
-import { HAZARD_RESULTS } from '../game/core';
+import { playerCenter } from '../state/game/player';
+import { HAZARD_RESULTS } from '../state/game';
 import { HAZARD_ZONE_COLOR } from './Level';
 
 export default function HazardFeedback ({ player, level, elapsedTime, unitLength, yOffset, effectDuration }) {
@@ -20,14 +20,17 @@ export default function HazardFeedback ({ player, level, elapsedTime, unitLength
     ? 1 + (lastHazardEvent.result.velocity - 1) / 2
     : 1;
 
-  const displayProps = lastHazardEvent && lastHazardEvent.result === HAZARD_RESULTS.FAIL
-  ? {
+  const useFailureEffect = lastHazardEvent
+    && lastHazardEvent.result.text === HAZARD_RESULTS.FAIL.text;
+
+  const displayProps = useFailureEffect
+  ? { // shake
     x: center.x + Math.sin(Math.PI * 10 * t) * unitLength / 8,
     y: center.y + yOffset * 0.75 * unitLength,
     shadowColor: HAZARD_ZONE_COLOR,
     font: { fontSize: 22/45 * unitLength }
   }
-  : {
+  : { // pop up
     x: center.x,
     y: center.y + (yOffset/3 - easeElastic(t, 0.5, 0.3) * 0.75) * unitLength,
     font: { fontSize: 22/45 * unitLength * fontScale }

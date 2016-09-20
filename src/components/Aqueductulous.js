@@ -2,58 +2,83 @@ import React, { Component } from 'react';
 import Game from './Game.js'
 import TitleScreen from './TitleScreen.js'
 import GameOver from './GameOver.js'
+import { fromJS } from 'immutable';
 
-import { GAMEMODE } from '../game/core.js';
+import { createInitialState, newGame } from '../state';
+
+const VIEWS = {
+  Title: 'Title',
+  Playing: 'Playing',
+  GameOver: 'GameOver',
+};
+
+function newLevelSeed() {
+  return window.btoa((Math.random() * 10e2).toFixed(0))
+}
 
 export default class Aqueductulous extends Component {
   constructor() {
     super();
 
-    this.showTitle = this.updateGameMode.bind(this, GAMEMODE.Title);
+    this.showTitle = this.updateView.bind(this, VIEWS.Title);
     this.newGame = () => {
-      window.history.replaceState({}, '', '#' + window.btoa((Math.random() * 10e2).toFixed(0)));
-      this.updateGameMode(GAMEMODE.Playing);
+      const newSeed = newLevelSeed();
+      window.history.replaceState({}, '', '#' + newSeed);
+      this.startGame(newSeed);
     };
-    this.rematch = this.updateGameMode.bind(this, GAMEMODE.Playing);
-    this.showGameOver = result => {
-      this.updateGameMode(GAMEMODE.GameOver, result);
-    }
+    this.rematch = this.startGame.bind(this, null);
+    this.showGameOver = this.updateView.bind(this, VIEWS.GameOver);
+    this.updateGame = this.updateGame.bind(this);
 
     this.state = {
-      gameMode: GAMEMODE.Title,
-      gameResult: undefined, /*{
-        time: 0,
-        won: false,
-      }*/
+      data: fromJS({
+        ...createInitialState(),
+        view: VIEWS.Title,
+      })
     }
   }
 
-  updateGameMode(gameMode, gameResult) {
-    this.setState({gameMode, gameResult});
+  startGame(seed) {
+    this.setState({ data: fromJS(newGame(this.state.data.toJS(), seed)) });
+    this.updateView(VIEWS.Playing);
+  }
+
+  updateView(view) {
+    this.setState(({data}) => ({
+      data: data.set('view', view)
+    }))
+  }
+
+  updateGame(game, onComplete) {
+    this.setState(({data}) => ({
+      data: data.set('game', fromJS(game))
+    }), onComplete);
   }
 
   render() {
-    const { gameMode, gameResult } = this.state;
+    const view = this.state.data.get('view');
+    const game = this.state.data.get('game');
     const hasSeed = !!window.location.hash;
 
-    switch (gameMode) {
-      case GAMEMODE.Title:
+    switch (view) {
+      case VIEWS.Title:
         return (
           <TitleScreen
             onStartGame={hasSeed ? this.rematch : this.newGame}
           />
         )
-      case GAMEMODE.Playing:
+      case VIEWS.Playing:
         return (
           <Game
-            seed={window.location.hash}
+            state={game.toJS()}
+            updateState={this.updateGame}
             onGameOver={this.showGameOver} 
           />
         );
-      case GAMEMODE.GameOver:
+      case VIEWS.GameOver:
         return (
           <GameOver
-            result={gameResult}
+            game={game.toJS()}
             onRematch={this.rematch}
             onNewGame={this.newGame}
           />
