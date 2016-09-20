@@ -2,14 +2,14 @@ import React, { Component } from 'react';
 import Game from './Game.js'
 import TitleScreen from './TitleScreen.js'
 import GameOver from './GameOver.js'
-import { fromJS } from 'immutable';
 
-import { createInitialState, newGame } from '../state';
+import { createInitialState } from '../state';
+import { createInitialState as createGame } from '../state/game'
 
 const VIEWS = {
-  Title: 'Title',
-  Playing: 'Playing',
-  GameOver: 'GameOver',
+  Title: Symbol('Title'),
+  Playing: Symbol('Playing'),
+  GameOver: Symbol('GameOver'),
 };
 
 function newLevelSeed() {
@@ -20,44 +20,32 @@ export default class Aqueductulous extends Component {
   constructor() {
     super();
 
-    this.showTitle = this.updateView.bind(this, VIEWS.Title);
-    this.newGame = () => {
-      const newSeed = newLevelSeed();
-      window.history.replaceState({}, '', '#' + newSeed);
-      this.startGame(newSeed);
-    };
-    this.rematch = this.startGame.bind(this, null);
-    this.showGameOver = this.updateView.bind(this, VIEWS.GameOver);
-    this.updateGame = this.updateGame.bind(this);
-
     this.state = {
-      data: fromJS({
-        ...createInitialState(),
-        view: VIEWS.Title,
-      })
+      ...createInitialState(),
+      view: VIEWS.Title,
     }
+
+    this.newGame = this.newGame.bind(this);
+    this.updateGame = (game, onComplete) => this.setState({ game }, onComplete);
+    this.showGameOver = this.setState.bind(this, { view: VIEWS.GameOver });
+    this.rematch = this.startGame.bind(this, null);
+  }
+
+  newGame() {
+    const newSeed = newLevelSeed();
+    window.history.replaceState({}, '', '#' + newSeed);
+    this.startGame(newSeed);
   }
 
   startGame(seed) {
-    this.setState({ data: fromJS(newGame(this.state.data.toJS(), seed)) });
-    this.updateView(VIEWS.Playing);
-  }
-
-  updateView(view) {
-    this.setState(({data}) => ({
-      data: data.set('view', view)
-    }))
-  }
-
-  updateGame(game, onComplete) {
-    this.setState(({data}) => ({
-      data: data.set('game', fromJS(game))
-    }), onComplete);
+    this.setState({
+      game: createGame(seed),
+      view: VIEWS.Playing,
+    });
   }
 
   render() {
-    const view = this.state.data.get('view');
-    const game = this.state.data.get('game');
+    const { view, game } = this.state;
     const hasSeed = !!window.location.hash;
 
     switch (view) {
@@ -70,7 +58,7 @@ export default class Aqueductulous extends Component {
       case VIEWS.Playing:
         return (
           <Game
-            state={game.toJS()}
+            state={game}
             updateState={this.updateGame}
             onGameOver={this.showGameOver} 
           />
@@ -78,7 +66,7 @@ export default class Aqueductulous extends Component {
       case VIEWS.GameOver:
         return (
           <GameOver
-            game={game.toJS()}
+            game={game}
             onRematch={this.rematch}
             onNewGame={this.newGame}
           />
