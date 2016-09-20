@@ -1,6 +1,9 @@
 import { HAZARD_RESULTS } from './core.js'
 
+import { LOGMESSAGETYPE, LOGGERMODULE, logger } from '../util/log.js'
+
 const Random = Math.random;
+const Log = logger(LOGGERMODULE.ENEMY);
 
 // Enemy AI profiles:
 
@@ -312,18 +315,19 @@ export function isEnemyAcclerating(state) {
     }
   }
 
-  console.log(String.prototype.concat(
-    "*AI* ",
-    "T: ", state.elapsedTime, 
-    ", x: ", enemyPlayer.position,
-    ", Boost? ", finalBoostDecision.shouldBoost, 
-    ", Basis: ", finalBoostDecision.decidedFrom,
-    ", Err: ", 
-      isErroneousDecision[Section.PREVIOUS] === undefined ? "n/a" : isErroneousDecision[Section.PREVIOUS], 
-      " ", isErroneousDecision[Section.CURRENT],
-      " ", isErroneousDecision[Section.NEXT] === undefined ? "n/a" : isErroneousDecision[Section.NEXT],
-    ", Haz: ", isHazard[Section.PREVIOUS], " ", isHazard[Section.CURRENT], " ", isHazard[Section.NEXT]
-  ));
+  Log(LOGMESSAGETYPE.KEYVALUE,
+    [ "T", state.elapsedTime ],
+    [ "x", enemyPlayer.position ],
+    [ "Boost", finalBoostDecision.shouldBoost ], 
+    [ "Basis", finalBoostDecision.decidedFrom ],
+    [ "Err(p,c,n)", 
+      [ isErroneousDecision[Section.PREVIOUS] === undefined ? "n/a" : isErroneousDecision[Section.PREVIOUS], 
+        isErroneousDecision[Section.CURRENT],
+        isErroneousDecision[Section.NEXT] === undefined ? "n/a" : isErroneousDecision[Section.NEXT] ]
+    ],
+    ["Haz(p,c,n)",
+      [isHazard[Section.PREVIOUS], isHazard[Section.CURRENT], isHazard[Section.NEXT]]
+    ]);
 
   return finalBoostDecision.shouldBoost;
 }

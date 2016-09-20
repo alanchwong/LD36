@@ -1,6 +1,10 @@
 import Bezier from 'bezier-js';
 import makeRandomGenerator from 'seed-random';
 
+import { LOGMESSAGETYPE, LOGGERMODULE, logger } from '../util/log.js'
+
+const Log = logger(LOGGERMODULE.LEVEL);
+
 export function createLevel(startingYOffset=4.5, seed)
 {
   const MAX_X = 120;
@@ -80,11 +84,12 @@ export function createLevel(startingYOffset=4.5, seed)
   curve.push(makeCubicBezier(2 * (lastX + 5) - (lastX + 3), 4.5, lastX + 7, 4.5, lastX + 10, 4.5));
   hazards.push(false);
 
-  // TODO logging
-  console.log(String.prototype.concat("Hazards seed: ", seed));
+  Log(LOGMESSAGETYPE.KEYVALUE, ["Seed", seed]);
 
-  hazards.map( (value, index, array) => {
-    console.log(String.prototype.concat("endpt: ", curve[index].endpoint.x, " haz: ", value));
+  hazards.forEach( (value, index, array) => {
+    Log(LOGMESSAGETYPE.KEYVALUE,
+        ["EndPt", curve[index].endpoint.x],
+        ["Haz", value]);
   });
 
   return { curve, hazards };

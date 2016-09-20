@@ -5,6 +5,7 @@ let enabledModules = {};
 export const LOGGERMODULE = {
   LEVEL: "Level",
   ENEMY: "Enemy",
+  CORE: "Core",
 };
 
 // Indicates the type of logging message supplied to the logger.

@@ -11,6 +11,10 @@ import { createEnemyProfile, isEnemyAcclerating } from './enemy.js'
 import { createLevel, indexForX, segmentForIndex } from './level.js'
 import { playerXOffset } from './player.js'
 
+import { LOGMESSAGETYPE, LOGGERMODULE, logger } from '../util/log.js'
+
+const Log = logger(LOGGERMODULE.CORE);
+
 const VELOCITY = {
   SLOW: 2.5,
   FAST: 4
@@ -88,8 +92,7 @@ export function updateTime(state, elapsedTime) {
     state.enemyLevel.curve[state.enemyLevel.curve.length - 1].endpoint.x : 
     enemyPosition + enemyVelocity * hazardVelocityModifier(state, CHARACTER.ENEMY) * dt;
 
-  // TODO: This is bullshit
-  console.log("UpdateTime Start " + elapsedTime);
+  Log(LOGMESSAGETYPE.MESSAGE, "UpdateTime Start " + elapsedTime);
   
   const updatedMotion = {
     ...state,
@@ -117,8 +120,7 @@ export function updateTime(state, elapsedTime) {
     },
   };
 
-  // TODO THIS IS ALSO bullshit
-  console.log("UpdateTime finished " + elapsedTime);
+  Log(LOGMESSAGETYPE.MESSAGE, "UpdateTime finished " + elapsedTime);
 
   return newNewState;
 }
@@ -158,12 +160,11 @@ function updateHazardEvent(state, character = CHARACTER.PLAYER) {
       const previousIndex = indexForX(curve, positionVisualAdjust) - 1;
 
       if (character === CHARACTER.ENEMY) {
-        console.log(String.prototype.concat(
-          "*HCalc1 ",
-          "x: ", positionVisualAdjust,
-          ", PrevIdx: ", previousIndex,
-          ", IsPrevHaz: ", hazards[previousIndex],
-        ));
+        Log(LOGMESSAGETYPE.KEYVALUE,
+          [ "*EnemyHCalc1*", "" ], 
+          [ "x", positionVisualAdjust ],
+          [ "PrevIdx", previousIndex ],
+          [ "IsPrevHaz: ", hazards[previousIndex] ] );
       }
 
       if (previousIndex >= 0 && hazards[previousIndex]) {
@@ -174,27 +175,26 @@ function updateHazardEvent(state, character = CHARACTER.PLAYER) {
         if (hazardDistance <= HAZARD_RESULTS.AMAZING.window) hazardResult = HAZARD_RESULTS.AMAZING;
 
         if (character === CHARACTER.ENEMY) {
-          console.log(String.prototype.concat(
-            "*HCalc2 ",
-            "prevX: ", segment.endpoint.x,
-            ", HazDist: ", hazardDistance
-          ));
+          Log(LOGMESSAGETYPE.KEYVALUE,
+            [ "*EnemyHCalc2*", "" ],
+            [ "prevX", segment.endpoint.x ],
+            [ "HazDist", hazardDistance ]
+          );
         }
       }
     }
   }
 
   if (character === CHARACTER.ENEMY) {
-    console.log(String.prototype.concat(
-      "*HCalc3 ",
-      "T: ", elapsedTime,
-      ", x: ", position,
-      ", acc: ", accelerating,
-      ", idx: ", indexForX(curve, positionVisualAdjust),
-      ", isHaz: ", isHazard,
-      ", HazRes: ", hazardResult,
-      ", LastHazRes: ", currentHazardResult(state),
-    ));
+    Log(LOGMESSAGETYPE.KEYVALUE, 
+      [ "*EnemyHCalc3", "" ],
+      [ "T", elapsedTime ],
+      [ "x", position ],
+      [ "acc", accelerating ],
+      [ "idx", indexForX(curve, positionVisualAdjust)],
+      [ "isHaz", isHazard ],
+      [ "HazRes", hazardResult === undefined ? "n/a" : hazardResult.text ],
+      [ "LastHazRes", ((currHazRes=currentHazardResult(state, character)) => { return currHazRes !== undefined ? currHazRes.text : "n/a" })() ]);
   }
 
   if (hazardResult) {
@@ -212,13 +212,11 @@ function updateHazardEvent(state, character = CHARACTER.PLAYER) {
       }
     }
     else if (character === CHARACTER.ENEMY) {
-      // TODO: REMOVE LATER
-      console.log(String.prototype.concat(
-        "*H* ",
-        "T: ", newLastHazardEvent.time, 
-        ", x: ", position, 
-        ", ", newLastHazardEvent.result.text
-        ));
+      Log(LOGMESSAGETYPE.KEYVALUE,
+        [ "*EnemyHaz*", "" ],
+        [ "T", newLastHazardEvent.time ], 
+        [ "x", position ], 
+        [ "Result", newLastHazardEvent.result.text ]);
       return {
         ...state,
         enemyPlayer: {
@@ -235,8 +233,11 @@ function updateHazardEvent(state, character = CHARACTER.PLAYER) {
 
   // No hazard result AND in hazard means smartly didn't boost in hazard.
   if (character === CHARACTER.ENEMY && isHazard) { 
-    console.log(
-    String.prototype.concat("*H* t:", elapsedTime,"x:", position, ", OK"));
+    Log(LOGMESSAGETYPE.KEYVALUE,
+      [ "*EnemyHaz*", "" ],
+      [ "T", elapsedTime ],
+      [ "x", position ], 
+      [ "Result", "OK no boost." ]);
   }
 
   return state;
