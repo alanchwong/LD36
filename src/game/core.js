@@ -11,9 +11,9 @@ import { createEnemyProfile, isEnemyAcclerating } from './enemy.js'
 import { createLevel, indexForX, segmentForIndex } from './level.js'
 import { playerXOffset } from './player.js'
 
-import { LOGMESSAGETYPE, LOGGERMODULE, logger } from '../util/log.js'
+import logger from '../util/log.js'
 
-const Log = logger(LOGGERMODULE.CORE);
+const Log = logger("Core");
 
 const VELOCITY = {
   SLOW: 2.5,
@@ -92,7 +92,7 @@ export function updateTime(state, elapsedTime) {
     state.enemyLevel.curve[state.enemyLevel.curve.length - 1].endpoint.x : 
     enemyPosition + enemyVelocity * hazardVelocityModifier(state, CHARACTER.ENEMY) * dt;
 
-  Log(LOGMESSAGETYPE.MESSAGE, "UpdateTime Start " + elapsedTime);
+  Log({ message: "UpdateTime Start " + elapsedTime });
   
   const updatedMotion = {
     ...state,
@@ -120,7 +120,7 @@ export function updateTime(state, elapsedTime) {
     },
   };
 
-  Log(LOGMESSAGETYPE.MESSAGE, "UpdateTime finished " + elapsedTime);
+  Log({ message:"UpdateTime finished " + elapsedTime });
 
   return newNewState;
 }
@@ -160,11 +160,13 @@ function updateHazardEvent(state, character = CHARACTER.PLAYER) {
       const previousIndex = indexForX(curve, positionVisualAdjust) - 1;
 
       if (character === CHARACTER.ENEMY) {
-        Log(LOGMESSAGETYPE.KEYVALUE,
-          [ "*EnemyHCalc1*", "" ], 
-          [ "x", positionVisualAdjust ],
-          [ "PrevIdx", previousIndex ],
-          [ "IsPrevHaz: ", hazards[previousIndex] ] );
+        Log({
+          title: "EnemyHCalc1",
+          valuesMap: [
+            [ "x", positionVisualAdjust ],
+            [ "PrevIdx", previousIndex ],
+            [ "IsPrevHaz: ", hazards[previousIndex] ] ]
+          });
       }
 
       if (previousIndex >= 0 && hazards[previousIndex]) {
@@ -175,27 +177,33 @@ function updateHazardEvent(state, character = CHARACTER.PLAYER) {
         if (hazardDistance <= HAZARD_RESULTS.AMAZING.window) hazardResult = HAZARD_RESULTS.AMAZING;
 
         if (character === CHARACTER.ENEMY) {
-          Log(LOGMESSAGETYPE.KEYVALUE,
-            [ "*EnemyHCalc2*", "" ],
-            [ "prevX", segment.endpoint.x ],
-            [ "HazDist", hazardDistance ]
-          );
+          Log({
+            title: "EnemyHCalc2",
+            valuesMap: [
+              [ "prevX", segment.endpoint.x ],
+              [ "HazDist", hazardDistance ] ]
+            });
         }
       }
     }
   }
 
   if (character === CHARACTER.ENEMY) {
-    Log(LOGMESSAGETYPE.KEYVALUE, 
-      [ "*EnemyHCalc3", "" ],
-      [ "T", elapsedTime ],
-      [ "x", position ],
-      [ "acc", accelerating ],
-      [ "idx", indexForX(curve, positionVisualAdjust)],
-      [ "isHaz", isHazard ],
-      [ "HazRes", hazardResult === undefined ? "n/a" : hazardResult.text ],
-      [ "LastHazRes", ((currHazRes=currentHazardResult(state, character)) => { return currHazRes !== undefined ? currHazRes.text : "n/a" })() ]);
-  }
+    Log({
+      title: "EnemyHCalc3",
+      valuesMap: [ 
+        [ "T", elapsedTime ],
+        [ "x", position ],
+        [ "acc", accelerating ],
+        [ "idx", indexForX(curve, positionVisualAdjust)],
+        [ "isHaz", isHazard ],
+        [ "HazRes", hazardResult === undefined ? "n/a" : hazardResult.text ],
+        [ "LastHazRes", 
+          ((currHazRes=currentHazardResult(state, character)) => { 
+            return currHazRes !== undefined ? currHazRes.text : "n/a" 
+          })() ] ]
+    });  
+}
 
   if (hazardResult) {
     const newAccelerating = hazardResult === HAZARD_RESULTS.FAIL ? false : accelerating;
@@ -212,11 +220,13 @@ function updateHazardEvent(state, character = CHARACTER.PLAYER) {
       }
     }
     else if (character === CHARACTER.ENEMY) {
-      Log(LOGMESSAGETYPE.KEYVALUE,
-        [ "*EnemyHaz*", "" ],
-        [ "T", newLastHazardEvent.time ], 
-        [ "x", position ], 
-        [ "Result", newLastHazardEvent.result.text ]);
+      Log({
+        title: "EnemyHaz",
+        valuesMap: [
+          [ "T", newLastHazardEvent.time ], 
+          [ "x", position ], 
+          [ "Result", newLastHazardEvent.result.text ] ]
+      });
       return {
         ...state,
         enemyPlayer: {
@@ -233,11 +243,13 @@ function updateHazardEvent(state, character = CHARACTER.PLAYER) {
 
   // No hazard result AND in hazard means smartly didn't boost in hazard.
   if (character === CHARACTER.ENEMY && isHazard) { 
-    Log(LOGMESSAGETYPE.KEYVALUE,
-      [ "*EnemyHaz*", "" ],
-      [ "T", elapsedTime ],
-      [ "x", position ], 
-      [ "Result", "OK no boost." ]);
+    Log({
+      title: "EnemyHaz",
+      valuesMap: [ 
+        [ "T", elapsedTime ],
+        [ "x", position ], 
+        [ "Result", "OK no boost." ] ]
+      });
   }
 
   return state;
