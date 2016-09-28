@@ -8,6 +8,7 @@ const Log = logger("Level");
 export function createLevel(startingYOffset=4.5, seed)
 {
   const MAX_X = 120;
+  const END_OF_TRACK = 130;
 
   const MAX_Y = 6.5;
   const MIN_Y = 2.5;
@@ -77,11 +78,24 @@ export function createLevel(startingYOffset=4.5, seed)
 
   // Generate last segments as straight line
   const lastX = curve[lastIdx].endpoint.x;
-  let lastCtrlPt1X = 2 * curve[lastIdx].endpoint.x - curve[lastIdx].controlPoint2.x;
-  let lastCtrlPt1Y = 2 * curve[lastIdx].endpoint.y - curve[lastIdx].controlPoint2.y;
-  curve.push(makeCubicBezier(lastCtrlPt1X, lastCtrlPt1Y, lastX + 3, 4.5, lastX + 5, 4.5));
+  const remainder = END_OF_TRACK - lastX;
+  curve.push(makeCubicBezier(
+    2 * curve[lastIdx].endpoint.x - curve[lastIdx].controlPoint2.x, // ctrl pt 1 x
+    2 * curve[lastIdx].endpoint.y - curve[lastIdx].controlPoint2.y, // ctrl pt 1 y
+    1/4 * remainder + lastX, // ctrl pt 2 x 
+    4.5, // ctrl pt 2 y
+    2/4 * remainder + lastX, // end point x
+    4.5 // end point y
+  ));
   hazards.push(false);
-  curve.push(makeCubicBezier(2 * (lastX + 5) - (lastX + 3), 4.5, lastX + 7, 4.5, lastX + 10, 4.5));
+  curve.push(makeCubicBezier(
+    2 * (2/4 * remainder + lastX) - (1/4 * remainder + lastX), // ctrl pt 1 x
+    4.5, // ctrl pt 1 y
+    3/4 * remainder + lastX, // ctrl pt 2 x
+    4.5, // ctrl pt 2 y
+    END_OF_TRACK, // end point x
+    4.5 // end point y
+  ));
   hazards.push(false);
 
   Log({ valuesMap: [ ["Seed", seed] ] });
