@@ -1,6 +1,6 @@
 import React from 'react';
 import { Group, Shape, Transform } from 'react-art';
-import Wedge from 'react-art/shapes/wedge';
+import Wedge from 'react-art/Wedge';
 import BubbleEffect from './BubbleEffect';
 import SplashEffect from './SplashEffect';
 

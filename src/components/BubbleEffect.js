@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
 import { Group } from 'react-art';
-import Circle from 'react-art/shapes/circle';
+import Circle from 'react-art/Circle';
 import Color from 'color';
 
 class Bubble extends Component {

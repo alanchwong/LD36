@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
 import { Group, Text } from 'react-art';
-import Rectangle from 'react-art/shapes/rectangle';
+import Rectangle from 'react-art/Rectangle';
 
 export default class Button extends Component {
   constructor() {

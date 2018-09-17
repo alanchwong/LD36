@@ -40,7 +40,7 @@ function TitleScreenLayout ({
     "Control the flow rate of your aqueduct by pressing any button.",
     "Watch out though: your builders made mistakes, and some",
     "sections of the track can't handle high speeds. Good luck!"
-  ]
+  ].join('\n');
 
   return (
     <Group>

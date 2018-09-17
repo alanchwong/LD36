@@ -1,6 +1,6 @@
 import React from 'react';
 import { Group, Shape } from 'react-art';
-import Rectangle from 'react-art/shapes/rectangle';
+import Rectangle from 'react-art/Rectangle'
 import range from 'lodash/range';
 
 export default function Background ({
