@@ -5,9 +5,9 @@ import GameOver from './GameOver.js'
 
 import { GAMEMODE } from '../game/core.js';
 
-import { initializeLogging } from '../util/log.js';
+import { WithDebugLogging } from '../util/log.js'
 
-export default class Aqueductulous extends Component {
+export class Aqueductulous extends Component {
   constructor() {
     super();
 
@@ -28,8 +28,6 @@ export default class Aqueductulous extends Component {
         won: false,
       }*/
     }
-
-    initializeLogging();
   }
 
   updateGameMode(gameMode, gameResult) {
@@ -67,3 +65,5 @@ export default class Aqueductulous extends Component {
     }
   }
 }
+
+export default WithDebugLogging(Aqueductulous);
